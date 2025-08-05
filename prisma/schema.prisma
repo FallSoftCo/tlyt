@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  workosId  String   @unique @map("workos_id")
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Video {
+  id                    String   @id @default(cuid())
+  youtubeId             String   @unique @map("youtube_id")
+  title                 String
+  description           String?
+  channelId             String   @map("channel_id")
+  channelTitle          String   @map("channel_title")
+  publishedAt           DateTime @map("published_at")
+  duration              String
+  tags                  String[]
+  categoryId            String?  @map("category_id")
+  defaultLanguage       String?  @map("default_language")
+  defaultAudioLanguage  String?  @map("default_audio_language")
+  dimension             String?
+  definition            String?
+  viewCount             BigInt?  @map("view_count")
+  likeCount             BigInt?  @map("like_count")
+  commentCount          BigInt?  @map("comment_count")
+  privacyStatus         String?  @map("privacy_status")
+  licensedContent       Boolean? @map("licensed_content")
+  chipCost              Int      @map("chip_cost")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("videos")
+}
