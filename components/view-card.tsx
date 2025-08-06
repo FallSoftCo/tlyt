@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ClockIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import { updateViewExpansion, requestFreeAnalysis } from '@/app/actions'
+import { AnalysisLoading } from '@/components/analysis-loading'
 import type { View, Video, Analysis } from '@/lib/generated/prisma'
 
 interface ViewCardProps {
@@ -145,7 +146,7 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors">
               <div className="flex-1">
                 <h3 className="font-medium mb-1">TL;DR</h3>
-                <p className="text-sm text-muted-foreground line-clamp-2">
+                <p className="text-sm text-muted-foreground">
                   {analysis.tldr}
                 </p>
               </div>
@@ -195,33 +196,40 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
 
       {!analysis && (
         <CardContent className="pt-0">
-          <div className="p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium mb-1">Analysis</p>
-                <p className="text-sm text-muted-foreground">
-                  This video hasn&apos;t been analyzed yet
+          {isRequestingAnalysis ? (
+            <AnalysisLoading 
+              videoDuration={video.duration}
+              chipCost={video.chipCost}
+            />
+          ) : (
+            <div className="p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium mb-1">Analysis</p>
+                  <p className="text-sm text-muted-foreground">
+                    This video hasn&apos;t been analyzed yet
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary">
+                    {video.chipCost} chip{video.chipCost !== 1 ? 's' : ''}
+                  </Badge>
+                  <Button 
+                    onClick={handleRequestAnalysis}
+                    disabled={isRequestingAnalysis}
+                    size="sm"
+                  >
+                    Request Analysis
+                  </Button>
+                </div>
+              </div>
+              {analysisError && (
+                <p className="text-sm text-destructive mt-2">
+                  {analysisError}
                 </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary">
-                  {video.chipCost} chip{video.chipCost !== 1 ? 's' : ''}
-                </Badge>
-                <Button 
-                  onClick={handleRequestAnalysis}
-                  disabled={isRequestingAnalysis}
-                  size="sm"
-                >
-                  {isRequestingAnalysis ? 'Analyzing...' : 'Request Analysis'}
-                </Button>
-              </div>
+              )}
             </div>
-            {analysisError && (
-              <p className="text-sm text-destructive mt-2">
-                {analysisError}
-              </p>
-            )}
-          </div>
+          )}
         </CardContent>
       )}
     </Card>
