@@ -5,7 +5,24 @@ const logs: string[] = [];
 
 export const maxDuration = 60; // For streaming
 
+// Simple authentication check
+function authenticate(request: NextRequest): boolean {
+  const authHeader = request.headers.get('authorization');
+  const apiKey = process.env.LOGGING_API_KEY;
+  
+  if (!apiKey) {
+    return false; // Fail secure if no API key is set
+  }
+  
+  return authHeader === `Bearer ${apiKey}`;
+}
+
 export async function GET(request: NextRequest) {
+  // Check authentication first
+  if (!authenticate(request)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   const url = new URL(request.url);
   const action = url.searchParams.get('action');
 
@@ -53,6 +70,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Check authentication first
+  if (!authenticate(request)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   const { message, level = 'info' } = await request.json();
   const timestamp = new Date().toISOString();
   const logEntry = `[${timestamp}] [${level.toUpperCase()}] ${message}`;

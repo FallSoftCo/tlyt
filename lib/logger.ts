@@ -2,12 +2,20 @@
 class Logger {
   private async sendLog(message: string, level: 'info' | 'error' | 'warn' | 'debug' = 'info') {
     try {
+      const apiKey = process.env.NEXT_PUBLIC_LOGGING_API_KEY;
+      if (!apiKey) {
+        throw new Error('No API key configured');
+      }
+      
       await fetch('/api/logs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
         body: JSON.stringify({ message, level })
       });
-    } catch (error) {
+    } catch {
       // Fallback to console if API fails
       console.log(`[${level.toUpperCase()}] ${message}`);
     }
