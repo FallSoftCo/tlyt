@@ -175,7 +175,7 @@ export const analyzeVideoWithGemini = async (
         parts: [
           {
             text: (() => {
-              const defaultPrompt = "Analyze this video comprehensively. Provide a detailed summary, identify key moments with precise timestamps, and create a concise TL;DR. Focus on main topics, important transitions, and actionable insights.";
+              const defaultPrompt = "Analyze this video comprehensively. Provide a detailed summary, identify key moments with precise timestamps, and create a concise TL;DR. Focus on main topics, important transitions, and actionable insights.\n\nIMPORTANT: Timestamps must be:\n1. In seconds (integers only)\n2. Sorted chronologically from earliest to latest\n3. Within the actual duration of the video\n4. Evenly distributed throughout the video (not clustered at the beginning)\n5. Representative of key moments, transitions, and important content changes";
               return userPrompt 
                 ? `${defaultPrompt}\n\nAdditional instructions: ${userPrompt}`
                 : defaultPrompt;
