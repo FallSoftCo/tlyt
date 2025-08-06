@@ -198,7 +198,6 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
         <CardContent className="pt-0">
           {isRequestingAnalysis ? (
             <AnalysisLoading 
-              videoDuration={video.duration}
               chipCost={video.chipCost}
             />
           ) : (

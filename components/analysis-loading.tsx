@@ -5,7 +5,6 @@ import { Loader2, Video, FileText, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
 interface AnalysisLoadingProps {
-  videoDuration?: string
   chipCost?: number
 }
 
@@ -27,48 +26,30 @@ const LOADING_STAGES = [
   }
 ] as const
 
-export function AnalysisLoading({ videoDuration, chipCost }: AnalysisLoadingProps) {
+export function AnalysisLoading({ chipCost }: AnalysisLoadingProps) {
   const [currentStage, setCurrentStage] = useState(0)
   const [progress, setProgress] = useState(0)
   const [elapsedTime, setElapsedTime] = useState(0)
 
-  // Calculate estimated total time based on video duration (rough estimate)
-  const getEstimatedTime = () => {
-    if (!videoDuration) return 15 // Default 15 seconds
-    
-    // Parse duration string like "PT4M13S" or "PT1H2M10S"
-    const match = videoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
-    if (!match) return 15
-    
-    const hours = parseInt(match[1] || '0')
-    const minutes = parseInt(match[2] || '0')
-    const seconds = parseInt(match[3] || '0')
-    const totalMinutes = hours * 60 + minutes + seconds / 60
-    
-    // Rough estimate: 3-5 seconds per minute of video, minimum 10 seconds
-    return Math.max(10, Math.min(30, totalMinutes * 0.5))
-  }
-
-  const estimatedTime = getEstimatedTime()
 
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsedTime(prev => prev + 0.1)
       
-      // Update progress based on elapsed time and estimated total time
-      const newProgress = Math.min(95, (elapsedTime / estimatedTime) * 100)
+      // Linear progress over 1 minute, cap at 90%
+      const newProgress = Math.min(90, (elapsedTime / 60) * 100)
       setProgress(newProgress)
 
-      // Change stages based on progress
-      if (newProgress > 25 && currentStage === 0) {
+      // Change stages at 20s and 40s
+      if (elapsedTime > 20 && currentStage === 0) {
         setCurrentStage(1)
-      } else if (newProgress > 60 && currentStage === 1) {
+      } else if (elapsedTime > 40 && currentStage === 1) {
         setCurrentStage(2)
       }
     }, 100)
 
     return () => clearInterval(interval)
-  }, [elapsedTime, estimatedTime, currentStage])
+  }, [elapsedTime, currentStage])
 
   const CurrentIcon = LOADING_STAGES[currentStage].icon
 
@@ -105,12 +86,12 @@ export function AnalysisLoading({ videoDuration, chipCost }: AnalysisLoadingProp
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{Math.round(progress)}% complete</span>
           <span>
-            {Math.round(elapsedTime)}s / ~{estimatedTime}s
+            {Math.round(elapsedTime)}s / ~60s
           </span>
         </div>
 
         <div className="text-xs text-muted-foreground">
-          <p>Our AI is carefully analyzing your video to provide the best insights.</p>
+          <p>Analysis takes about 1 minute. Our AI is carefully processing your video.</p>
         </div>
       </div>
     </div>
