@@ -51,3 +51,53 @@ model Video {
 
   @@map("videos")
 }
+
+model Analysis {
+  id                      String   @id @default(cuid())
+  userId                  String   @map("user_id")
+  videoId                 String   @map("video_id")
+  summary                 String
+  tldr                    String
+  timestampSeconds        Int[]    @map("timestamp_seconds")
+  timestampDescriptions   String[] @map("timestamp_descriptions")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("analyses")
+}
+
+model Request {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  analysisIds String[] @map("analysis_ids")
+  videoIds    String[] @map("video_ids")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("requests")
+}
+
+model View {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  videoIds    String[] @map("video_ids")
+  requestIds  String[] @map("request_ids")
+  analysisIds String[] @map("analysis_ids")
+  isExpanded  Boolean  @map("is_expanded")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("views")
+}
+
+model History {
+  id                 String   @id @default(cuid())
+  userId             String   @map("user_id")
+  viewIds            String[] @map("view_ids")
+  currentPositionIndex Int    @default(0) @map("current_position_index")
+  pageSize           Int      @default(20) @map("page_size")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("histories")
+}
