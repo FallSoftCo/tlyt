@@ -179,15 +179,19 @@ export const analyzeVideoWithGemini = async (
             text: (() => {
               const durationInSeconds = parseISO8601DurationToSeconds(videoDuration);
               
-              // Generate evenly distributed timestamps for better accuracy
-              const numTimestamps = Math.min(10, Math.max(3, Math.floor(durationInSeconds / 60))); // 3-10 timestamps based on length
-              const interval = Math.floor(durationInSeconds / (numTimestamps + 1));
-              const suggestedTimestamps = [];
-              for (let i = 1; i <= numTimestamps; i++) {
-                suggestedTimestamps.push(i * interval);
+              // Generate 10 evenly distributed timestamps with small jitter
+              const baseInterval = durationInSeconds / 11; // 11 intervals for 10 timestamps
+              const structuredTimestamps = [];
+              for (let i = 1; i <= 10; i++) {
+                const baseTime = Math.floor(i * baseInterval);
+                // Add small jitter (±5% of interval, max ±10 seconds)
+                const jitter = Math.floor((Math.random() - 0.5) * Math.min(baseInterval * 0.1, 20));
+                const timestamp = Math.max(5, Math.min(durationInSeconds - 5, baseTime + jitter));
+                structuredTimestamps.push(timestamp);
               }
+              structuredTimestamps.sort((a, b) => a - b); // Ensure sorted
               
-              const defaultPrompt = `Analyze this video comprehensively. Provide a detailed summary and create a concise TL;DR.\n\nThis video is ${durationInSeconds} seconds long. For timestamps, analyze what happens at these specific times and provide meaningful descriptions:\n${suggestedTimestamps.map(t => `- ${t} seconds`).join('\n')}\n\nFor each timestamp, describe what's happening, any key points being made, or important transitions occurring at that moment. If nothing significant happens at a specific timestamp, describe the general content/topic being covered at that time.`;
+              const defaultPrompt = `Analyze this video comprehensively. Provide a detailed summary and create a concise TL;DR.\n\nThis video is ${durationInSeconds} seconds long. Provide timestamps in TWO categories:\n\n1. STRUCTURED TIMESTAMPS: Analyze what happens at these 10 specific times (with jitter for natural distribution):\n${structuredTimestamps.map(t => `- ${t} seconds`).join('\n')}\n\n2. CONTENT-DRIVEN TIMESTAMPS: Additionally, identify up to 7 truly significant moments (key transitions, important points, dramatic changes) with their exact timestamps. These should be genuinely meaningful moments you determine, not just arbitrary times.\n\nFor ALL timestamps, describe what's happening, key points being made, or important transitions. Ensure all timestamps are between 0 and ${durationInSeconds} seconds and are sorted chronologically.`;
               
               return userPrompt 
                 ? `${defaultPrompt}\n\nAdditional instructions: ${userPrompt}`
@@ -221,16 +225,21 @@ export const analyzeVideoWithGemini = async (
                 properties: {
                   seconds: {
                     type: "INTEGER",
-                    description: "Timestamp position in seconds (must match one of the requested timestamps)"
+                    description: "Timestamp position in seconds"
                   },
                   description: {
                     type: "STRING", 
-                    description: "Description of what happens at this exact timestamp"
+                    description: "Description of what happens at this timestamp"
+                  },
+                  type: {
+                    type: "STRING",
+                    enum: ["structured", "content-driven"],
+                    description: "Whether this is a requested structured timestamp or a content-driven significant moment"
                   }
                 },
-                required: ["seconds", "description"]
+                required: ["seconds", "description", "type"]
               },
-              description: "Array of timestamp objects analyzing the requested time points"
+              description: "Array of timestamp objects (10 structured + up to 7 content-driven), sorted chronologically"
             }
           },
           required: ["summary", "tldr", "timestamps"]
@@ -284,32 +293,31 @@ export const analyzeVideoWithGemini = async (
     // Transform timestamp objects into separate arrays for database storage
     const durationInSeconds = parseISO8601DurationToSeconds(videoDuration);
     
-    // Generate the same timestamps we requested for validation
-    const numTimestamps = Math.min(10, Math.max(3, Math.floor(durationInSeconds / 60)));
-    const interval = Math.floor(durationInSeconds / (numTimestamps + 1));
-    const expectedTimestamps = new Set();
-    for (let i = 1; i <= numTimestamps; i++) {
-      expectedTimestamps.add(i * interval);
-    }
-    
     const timestampSeconds: number[] = [];
     const timestampDescriptions: string[] = [];
+    let structuredCount = 0;
+    let contentDrivenCount = 0;
     
     for (const timestamp of analysisData.timestamps) {
       if (typeof timestamp.seconds === 'number' && typeof timestamp.description === 'string') {
-        // Validate timestamp is within video duration and matches expected timestamps
+        // Validate timestamp is within video duration
         if (timestamp.seconds >= 0 && timestamp.seconds <= durationInSeconds) {
           timestampSeconds.push(timestamp.seconds);
           timestampDescriptions.push(timestamp.description);
           
-          if (!expectedTimestamps.has(timestamp.seconds)) {
-            console.warn(`Unexpected timestamp: ${timestamp.seconds}s (not in requested set)`);
+          // Track timestamp types for logging
+          if (timestamp.type === 'structured') {
+            structuredCount++;
+          } else if (timestamp.type === 'content-driven') {
+            contentDrivenCount++;
           }
         } else {
           console.warn(`Skipping out-of-bounds timestamp: ${timestamp.seconds}s (video is ${durationInSeconds}s)`);
         }
       }
     }
+    
+    console.log(`Received ${structuredCount} structured timestamps and ${contentDrivenCount} content-driven timestamps`);
     console.log('Transformed timestamps:', { timestampSeconds, timestampDescriptions });
 
     // Create Analysis record in database
