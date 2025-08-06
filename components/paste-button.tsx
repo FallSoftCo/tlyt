@@ -53,8 +53,14 @@ export function PasteButton({ userId, onVideoSubmitted }: PasteButtonProps) {
       setSuccess(true)
       onVideoSubmitted?.()
       
-      // Reset success state after 2 seconds
-      setTimeout(() => setSuccess(false), 2000)
+      // Reset success state and refresh page after 2 seconds
+      setTimeout(() => {
+        setSuccess(false)
+        // If no custom callback provided, refresh the page to show new video
+        if (!onVideoSubmitted) {
+          window.location.reload()
+        }
+      }, 2000)
       
     } catch (err) {
       if (err instanceof Error && err.name === 'NotAllowedError') {

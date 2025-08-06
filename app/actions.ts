@@ -8,8 +8,10 @@ import {
   withAuth,
   signOut,
 } from '@workos-inc/authkit-nextjs';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '../lib/prisma';
 import { extractVideoId, fetchVideoMetadata, mapYouTubeDataToVideo } from '../lib/youtube';
+import { logger } from '../lib/logger';
 import type { Video, Analysis, View, User, History, Request } from '../lib/generated/prisma';
 
 // WorkOS Authentication functions
@@ -172,18 +174,17 @@ export const analyzeVideoWithGemini = async (
       contents: [{
         parts: [
           {
-            fileData: {
-              mimeType: "video/mp4",
-              fileUri: `https://www.youtube.com/watch?v=${youtubeId}`
-            }
-          },
-          {
             text: (() => {
               const defaultPrompt = "Analyze this video comprehensively. Provide a detailed summary, identify key moments with precise timestamps, and create a concise TL;DR. Focus on main topics, important transitions, and actionable insights.";
               return userPrompt 
                 ? `${defaultPrompt}\n\nAdditional instructions: ${userPrompt}`
                 : defaultPrompt;
             })()
+          },
+          {
+            fileData: {
+              fileUri: `https://www.youtube.com/watch?v=${youtubeId}`
+            }
           }
         ]
       }],
@@ -200,18 +201,26 @@ export const analyzeVideoWithGemini = async (
               type: "STRING",
               description: "Concise TL;DR summary"
             },
-            timestampSeconds: {
+            timestamps: {
               type: "ARRAY",
-              items: { type: "INTEGER" },
-              description: "Array of timestamp positions in seconds"
-            },
-            timestampDescriptions: {
-              type: "ARRAY",
-              items: { type: "STRING" },
-              description: "Array of descriptions for each timestamp"
+              items: {
+                type: "OBJECT",
+                properties: {
+                  seconds: {
+                    type: "INTEGER",
+                    description: "Timestamp position in seconds"
+                  },
+                  description: {
+                    type: "STRING", 
+                    description: "Description of what happens at this timestamp"
+                  }
+                },
+                required: ["seconds", "description"]
+              },
+              description: "Array of timestamp objects with time and description"
             }
           },
-          required: ["summary", "tldr", "timestampSeconds", "timestampDescriptions"]
+          required: ["summary", "tldr", "timestamps"]
         }
       }
     };
@@ -242,31 +251,48 @@ export const analyzeVideoWithGemini = async (
     }
 
     const content = apiResponse.candidates[0].content.parts[0].text;
-    const analysisData = JSON.parse(content);
+    console.log('Raw Gemini response content:', content);
+    
+    let analysisData;
+    try {
+      analysisData = JSON.parse(content);
+      console.log('Parsed analysis data:', analysisData);
+    } catch (error) {
+      console.error('JSON parse error:', error);
+      return { success: false, error: 'Failed to parse Gemini API response as JSON' };
+    }
 
     // Validate response structure
-    if (!analysisData.summary || !analysisData.tldr || 
-        !Array.isArray(analysisData.timestampSeconds) || 
-        !Array.isArray(analysisData.timestampDescriptions)) {
+    if (!analysisData.summary || !analysisData.tldr || !Array.isArray(analysisData.timestamps)) {
+      console.error('Invalid analysis data structure:', analysisData);
       return { success: false, error: 'Invalid analysis data structure from API' };
     }
 
-    // Ensure timestamp arrays are the same length
-    if (analysisData.timestampSeconds.length !== analysisData.timestampDescriptions.length) {
-      return { success: false, error: 'Timestamp arrays length mismatch' };
+    // Transform timestamp objects into separate arrays for database storage
+    const timestampSeconds: number[] = [];
+    const timestampDescriptions: string[] = [];
+    
+    for (const timestamp of analysisData.timestamps) {
+      if (typeof timestamp.seconds === 'number' && typeof timestamp.description === 'string') {
+        timestampSeconds.push(timestamp.seconds);
+        timestampDescriptions.push(timestamp.description);
+      }
     }
+    console.log('Transformed timestamps:', { timestampSeconds, timestampDescriptions });
 
     // Create Analysis record in database
+    console.log('Creating analysis record in database...');
     const analysis = await prisma.analysis.create({
       data: {
         userId,
         videoId: youtubeId,
         summary: analysisData.summary,
         tldr: analysisData.tldr,
-        timestampSeconds: analysisData.timestampSeconds,
-        timestampDescriptions: analysisData.timestampDescriptions
+        timestampSeconds: timestampSeconds,
+        timestampDescriptions: timestampDescriptions
       }
     });
+    console.log('Analysis record created:', analysis.id);
 
     return { success: true, analysis };
 
@@ -911,6 +937,14 @@ export const requestFreeAnalysis = async (
       }
     });
 
+    // Revalidate the page to show fresh data
+    try {
+      revalidatePath('/');
+    } catch (error) {
+      // Continue anyway - don't fail the whole operation if revalidation fails
+      logger.error(`Error revalidating path: ${error}`);
+    }
+    
     return {
       success: true,
       request: updatedRequest,

@@ -1,24 +1,17 @@
 import { cookies } from 'next/headers'
-import { initializeUser, getUserData } from './actions'
+import { getUserData, initializeUser } from './actions'
 import { PasteButton } from '@/components/paste-button'
 import { ViewList } from '@/components/view-list'
+import { CookieHandler } from '@/components/cookie-handler'
 
 export default async function Home() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   let userId = cookieStore.get('userId')?.value
 
-  // Initialize or upgrade user
+  // If no userId, create a new unauthenticated user (cookies will be set client-side)
   if (!userId) {
-    // No existing user, create new one
     const result = await initializeUser()
-    if (result.success && result.user) {
-      userId = result.user.id
-      cookieStore.set('userId', userId, {
-        maxAge: 60 * 60 * 24 * 365, // 1 year
-        httpOnly: false, // Allow client access
-        sameSite: 'lax'
-      })
-    } else {
+    if (!result.success || !result.user) {
       return (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
@@ -28,19 +21,7 @@ export default async function Home() {
         </div>
       )
     }
-  } else {
-    // Existing user - check if they need authentication upgrade
-    const result = await initializeUser(userId)
-    if (result.success && result.user && result.user.id !== userId) {
-      // User switched to existing authenticated account, update cookie
-      userId = result.user.id
-      cookieStore.set('userId', userId, {
-        maxAge: 60 * 60 * 24 * 365, // 1 year
-        httpOnly: false,
-        sameSite: 'lax'
-      })
-    }
-    // Note: If upgrading existing user, userId stays the same
+    userId = result.user.id
   }
 
   // Get user data
@@ -60,6 +41,7 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      <CookieHandler userId={userId} />
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">TLYT</h1>
@@ -75,10 +57,6 @@ export default async function Home() {
                 <h2 className="text-xl font-semibold">Your Videos</h2>
                 <PasteButton 
                   userId={userId}
-                  onVideoSubmitted={() => {
-                    // Refresh the page to show new video
-                    window.location.reload()
-                  }}
                 />
               </div>
               <ViewList
@@ -86,10 +64,6 @@ export default async function Home() {
                 videos={videos}
                 analyses={analyses}
                 userId={userId}
-                onAnalysisRequested={() => {
-                  // Refresh the page to show new analysis
-                  window.location.reload()
-                }}
               />
             </div>
           ) : (
@@ -100,10 +74,6 @@ export default async function Home() {
               </p>
               <PasteButton 
                 userId={userId}
-                onVideoSubmitted={() => {
-                  // Refresh the page to show new video
-                  window.location.reload()
-                }}
               />
             </div>
           )}

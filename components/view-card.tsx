@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,16 +19,20 @@ interface ViewCardProps {
 }
 
 export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }: ViewCardProps) {
+  const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(view.isExpanded)
   const [isRequestingAnalysis, setIsRequestingAnalysis] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
-  const formatDuration = (durationMs: number) => {
-    const totalSeconds = Math.floor(durationMs / 1000)
-    const hours = Math.floor(totalSeconds / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
+  const formatDuration = (duration: string) => {
+    // Duration is in ISO 8601 format like "PT4M13S" or "PT1H2M10S"
+    const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+    if (!match) return duration
+    
+    const hours = parseInt(match[1] || '0')
+    const minutes = parseInt(match[2] || '0')
+    const seconds = parseInt(match[3] || '0')
 
     if (hours > 0) {
       return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
@@ -66,7 +71,13 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
         return
       }
       
-      onAnalysisRequested?.()
+      // Call callback if provided, otherwise use router.refresh() for efficient re-render
+      if (onAnalysisRequested) {
+        onAnalysisRequested()
+      } else {
+        // Refresh server components to show analysis results (revalidatePath handles cache invalidation)
+        router.refresh()
+      }
     } catch {
       setAnalysisError('An unexpected error occurred')
     } finally {
@@ -108,7 +119,7 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
           
           <CardDescription className="flex items-center gap-1 text-sm mb-4">
             <ClockIcon className="w-3 h-3" />
-            {formatDuration(video.durationMs)}
+            {formatDuration(video.duration)}
           </CardDescription>
 
           <iframe
