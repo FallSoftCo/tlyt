@@ -317,7 +317,7 @@ export const analyzeVideoWithGemini = async (
 }
 
 /**
- * Submit YouTube link for unauthenticated users with rate limiting
+ * Submit YouTube link for unauthenticated users (RATE LIMITING TEMPORARILY DISABLED)
  * Creates video and view models, with 1-hour rate limit based on previous requests
  * @param youtubeUrl - YouTube video URL
  * @param userIdentifier - User identifier (IP address, session ID, etc.)
@@ -341,23 +341,23 @@ export const submitYouTubeLinkUnauthenticated = async (
       return { success: false, error: 'Invalid user identifier provided' };
     }
 
-    // Rate limiting check - look for requests in the last hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const recentRequests = await prisma.request.findMany({
-      where: {
-        userId: userIdentifier,
-        createdAt: {
-          gte: oneHourAgo
-        }
-      }
-    });
+    // Rate limiting check - TEMPORARILY DISABLED
+    // const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    // const recentRequests = await prisma.request.findMany({
+    //   where: {
+    //     userId: userIdentifier,
+    //     createdAt: {
+    //       gte: oneHourAgo
+    //     }
+    //   }
+    // });
 
-    if (recentRequests.length > 0) {
-      return { 
-        success: false, 
-        error: 'Rate limit exceeded. You can only make one request per hour. Please try again later.' 
-      };
-    }
+    // if (recentRequests.length > 0) {
+    //   return { 
+    //     success: false, 
+    //     error: 'Rate limit exceeded. You can only make one request per hour. Please try again later.' 
+    //   };
+    // }
 
     // Process video using existing upsert action
     const videoResult = await upsertVideoAction(youtubeUrl);
@@ -813,7 +813,7 @@ export const getUserData = async (userId: string): Promise<{
 }
 
 /**
- * Request free analysis for unauthenticated users (rate limited to 1 per hour)
+ * Request free analysis for unauthenticated users (RATE LIMITING TEMPORARILY DISABLED)
  * Creates Request record, triggers analysis, and updates View atomically
  * @param viewId - ID of the view to analyze
  * @param userId - User ID making the request
@@ -858,23 +858,23 @@ export const requestFreeAnalysis = async (
       return { success: false, error: 'View already has analysis' };
     }
 
-    // Rate limiting check - look for requests in the last hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const recentRequests = await prisma.request.findMany({
-      where: {
-        userId: userId,
-        createdAt: {
-          gte: oneHourAgo
-        }
-      }
-    });
+    // Rate limiting check - TEMPORARILY DISABLED
+    // const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    // const recentRequests = await prisma.request.findMany({
+    //   where: {
+    //     userId: userId,
+    //     createdAt: {
+    //       gte: oneHourAgo
+    //     }
+    //   }
+    // });
 
-    if (recentRequests.length > 0) {
-      return { 
-        success: false, 
-        error: 'Rate limit exceeded. You can only make one analysis request per hour. Please try again later.' 
-      };
-    }
+    // if (recentRequests.length > 0) {
+    //   return { 
+    //     success: false, 
+    //     error: 'Rate limit exceeded. You can only make one analysis request per hour. Please try again later.' 
+    //   };
+    // }
 
     // Get video record ID from view
     const videoRecordId = existingView.videoIds[0];
