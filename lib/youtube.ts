@@ -119,6 +119,24 @@ export function parseISO8601Duration(duration: string): number {
 }
 
 /**
+ * Parse ISO 8601 duration format to total seconds
+ * @param duration ISO 8601 duration string (e.g., "PT4M13S", "PT1H30M45S")
+ * @returns Duration in seconds
+ */
+export function parseISO8601DurationToSeconds(duration: string): number {
+  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) {
+    throw new Error(`Invalid ISO 8601 duration format: ${duration}`);
+  }
+
+  const hours = parseInt(match[1] || '0', 10);
+  const minutes = parseInt(match[2] || '0', 10);
+  const seconds = parseInt(match[3] || '0', 10);
+
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+/**
  * Calculate chip cost based on video duration
  * - 1 chip = 30 minutes of video
  * - Videos ≤30 minutes = 1 chip (e.g., 5min = 1 chip, 30min = 1 chip)

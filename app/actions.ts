@@ -10,7 +10,7 @@ import {
 } from '@workos-inc/authkit-nextjs';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../lib/prisma';
-import { extractVideoId, fetchVideoMetadata, mapYouTubeDataToVideo } from '../lib/youtube';
+import { extractVideoId, fetchVideoMetadata, mapYouTubeDataToVideo, parseISO8601DurationToSeconds } from '../lib/youtube';
 import { logger } from '../lib/logger';
 import type { Video, Analysis, View, User, History, Request } from '../lib/generated/prisma';
 
@@ -135,6 +135,7 @@ export const upsertVideoAction = async (youtubeUrl: string, chipCost?: number): 
  * @param youtubeId - YouTube video ID
  * @param requestId - Associated request ID
  * @param userId - User ID who requested the analysis
+ * @param videoDuration - Video duration in ISO 8601 format (e.g., "PT4M13S")
  * @param userPrompt - Optional additional instructions from user
  * @returns Analysis record or error
  */
@@ -142,6 +143,7 @@ export const analyzeVideoWithGemini = async (
   youtubeId: string,
   requestId: string,
   userId: string,
+  videoDuration: string,
   userPrompt?: string
 ): Promise<{
   success: boolean;
@@ -175,7 +177,8 @@ export const analyzeVideoWithGemini = async (
         parts: [
           {
             text: (() => {
-              const defaultPrompt = "Analyze this video comprehensively. Provide a detailed summary, identify key moments with precise timestamps, and create a concise TL;DR. Focus on main topics, important transitions, and actionable insights.\n\nIMPORTANT: Timestamps must be:\n1. In seconds (integers only)\n2. Sorted chronologically from earliest to latest\n3. Within the actual duration of the video\n4. Evenly distributed throughout the video (not clustered at the beginning)\n5. Representative of key moments, transitions, and important content changes";
+              const durationInSeconds = parseISO8601DurationToSeconds(videoDuration);
+              const defaultPrompt = `Analyze this video comprehensively. Provide a detailed summary, identify key moments with precise timestamps, and create a concise TL;DR. Focus on main topics, important transitions, and actionable insights.\n\nIMPORTANT: This video is ${durationInSeconds} seconds long. Timestamps must be:\n1. In seconds (integers only)\n2. Sorted chronologically from earliest to latest\n3. Between 0 and ${durationInSeconds} seconds (within the actual video duration)\n4. Evenly distributed throughout the video (not clustered at the beginning)\n5. Representative of key moments, transitions, and important content changes`;
               return userPrompt 
                 ? `${defaultPrompt}\n\nAdditional instructions: ${userPrompt}`
                 : defaultPrompt;
@@ -269,13 +272,19 @@ export const analyzeVideoWithGemini = async (
     }
 
     // Transform timestamp objects into separate arrays for database storage
+    const durationInSeconds = parseISO8601DurationToSeconds(videoDuration);
     const timestampSeconds: number[] = [];
     const timestampDescriptions: string[] = [];
     
     for (const timestamp of analysisData.timestamps) {
       if (typeof timestamp.seconds === 'number' && typeof timestamp.description === 'string') {
-        timestampSeconds.push(timestamp.seconds);
-        timestampDescriptions.push(timestamp.description);
+        // Validate timestamp is within video duration
+        if (timestamp.seconds >= 0 && timestamp.seconds <= durationInSeconds) {
+          timestampSeconds.push(timestamp.seconds);
+          timestampDescriptions.push(timestamp.description);
+        } else {
+          console.warn(`Skipping out-of-bounds timestamp: ${timestamp.seconds}s (video is ${durationInSeconds}s)`);
+        }
       }
     }
     console.log('Transformed timestamps:', { timestampSeconds, timestampDescriptions });
@@ -906,6 +915,7 @@ export const requestFreeAnalysis = async (
       videoRecord.youtubeId, // Use YouTube ID for analysis
       request.id,
       userId,
+      videoRecord.duration, // Pass video duration
       userPrompt
     );
 
