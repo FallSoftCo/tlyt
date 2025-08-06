@@ -10,7 +10,7 @@ import {
 } from '@workos-inc/authkit-nextjs';
 import { prisma } from '../lib/prisma';
 import { extractVideoId, fetchVideoMetadata, mapYouTubeDataToVideo } from '../lib/youtube';
-import type { Video, Analysis, View, User, History } from '../lib/generated/prisma';
+import type { Video, Analysis, View, User, History, Request } from '../lib/generated/prisma';
 
 // WorkOS Authentication functions
 export const handleSignOutAction = async () => {
@@ -402,11 +402,12 @@ export const submitYouTubeLinkUnauthenticated = async (
 
 /**
  * Initialize user - checks WorkOS authentication and creates/updates User and History records
- * Handles both authenticated users (via WorkOS) and unauthenticated users (via userIdentifier)
- * @param userIdentifier - For unauthenticated users (IP, session ID, etc.)
+ * For authenticated users: finds by WorkOS ID or upgrades existing unauthenticated user
+ * For unauthenticated users: creates new User record
+ * @param existingUserId - Optional existing user ID from cookie for upgrade scenarios
  * @returns User info, authentication status, and associated history
  */
-export const initializeUser = async (userIdentifier?: string): Promise<{
+export const initializeUser = async (existingUserId?: string): Promise<{
   success: boolean;
   isAuthenticated: boolean;
   user?: User;
@@ -427,13 +428,13 @@ export const initializeUser = async (userIdentifier?: string): Promise<{
     if (workosUser) {
       // Handle authenticated user
       
-      // Find or create User record by workosId
+      // First, try to find existing user by WorkOS ID
       let user = await prisma.user.findUnique({
         where: { workosId: workosUser.id }
       });
 
       if (user) {
-        // Update existing user with latest info
+        // Update existing authenticated user with latest info
         user = await prisma.user.update({
           where: { id: user.id },
           data: {
@@ -444,8 +445,52 @@ export const initializeUser = async (userIdentifier?: string): Promise<{
             updatedAt: new Date()
           }
         });
+      } else if (existingUserId) {
+        // Try to upgrade existing unauthenticated user
+        const existingUser = await prisma.user.findUnique({
+          where: { id: existingUserId }
+        });
+
+        if (!existingUser) {
+          // Cookie points to non-existent user - data inconsistency
+          // Create new user and let page.tsx handle cookie update
+          user = await prisma.user.create({
+            data: {
+              workosId: workosUser.id,
+              email: workosUser.email,
+              name: workosUser.firstName && workosUser.lastName 
+                ? `${workosUser.firstName} ${workosUser.lastName}`
+                : workosUser.firstName || workosUser.lastName || undefined
+            }
+          });
+        } else if (!existingUser.workosId) {
+          // Upgrade the existing user with WorkOS data
+          user = await prisma.user.update({
+            where: { id: existingUserId },
+            data: {
+              workosId: workosUser.id,
+              email: workosUser.email,
+              name: workosUser.firstName && workosUser.lastName 
+                ? `${workosUser.firstName} ${workosUser.lastName}`
+                : workosUser.firstName || workosUser.lastName || undefined,
+              updatedAt: new Date()
+            }
+          });
+        } else {
+          // Existing user is already authenticated with different WorkOS account
+          // This shouldn't happen in normal flow, but handle gracefully
+          user = await prisma.user.create({
+            data: {
+              workosId: workosUser.id,
+              email: workosUser.email,
+              name: workosUser.firstName && workosUser.lastName 
+                ? `${workosUser.firstName} ${workosUser.lastName}`
+                : workosUser.firstName || workosUser.lastName || undefined
+            }
+          });
+        }
       } else {
-        // Create new user record
+        // No existing user, create new authenticated user
         user = await prisma.user.create({
           data: {
             workosId: workosUser.id,
@@ -481,17 +526,7 @@ export const initializeUser = async (userIdentifier?: string): Promise<{
       };
 
     } else {
-      // Handle unauthenticated user
-      if (!userIdentifier || typeof userIdentifier !== 'string') {
-        return { 
-          success: false, 
-          isAuthenticated: false, 
-          error: 'User identifier required for unauthenticated users' 
-        };
-      }
-
-      // For unauthenticated users, create a minimal user record
-      // We can use userIdentifier as a unique constraint or just create new records
+      // Handle unauthenticated user - simply create a new user record
       const user = await prisma.user.create({
         data: {
           workosId: null,
@@ -659,6 +694,276 @@ export const updateHistoryPosition = async (
       if (error.message.includes('Record to update not found')) {
         return { success: false, error: 'History record not found' };
       }
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Get complete user data including history, views, videos, and analyses
+ * @param userId - ID of the user whose data to fetch
+ * @returns Complete user state or error
+ */
+export const getUserData = async (userId: string): Promise<{
+  success: boolean;
+  user?: User;
+  history?: History;
+  views?: View[];
+  videos?: Video[];
+  analyses?: Analysis[];
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, error: 'Invalid user ID provided' };
+    }
+
+    // Get user record
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    // Get user's history
+    const history = await prisma.history.findFirst({
+      where: { userId: userId }
+    });
+
+    if (!history) {
+      return { success: false, error: 'History not found for user' };
+    }
+
+    // Get all views for this user
+    const views = await prisma.view.findMany({
+      where: { userId: userId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Collect all unique video IDs from views
+    const videoIds = Array.from(new Set(views.flatMap(view => view.videoIds)));
+    
+    // Get all videos
+    const videos = videoIds.length > 0 ? await prisma.video.findMany({
+      where: { id: { in: videoIds } }
+    }) : [];
+
+    // Collect all unique analysis IDs from views
+    const analysisIds = Array.from(new Set(views.flatMap(view => view.analysisIds)));
+    
+    // Get all analyses
+    const analyses = analysisIds.length > 0 ? await prisma.analysis.findMany({
+      where: { id: { in: analysisIds } }
+    }) : [];
+
+    return {
+      success: true,
+      user,
+      history,
+      views,
+      videos,
+      analyses
+    };
+
+  } catch (error) {
+    console.error('Error in getUserData:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Request free analysis for unauthenticated users (rate limited to 1 per hour)
+ * Creates Request record, triggers analysis, and updates View atomically
+ * @param viewId - ID of the view to analyze
+ * @param userId - User ID making the request
+ * @param userPrompt - Optional additional instructions from user
+ * @returns Request and Analysis records or error
+ */
+export const requestFreeAnalysis = async (
+  viewId: string,
+  userId: string,
+  userPrompt?: string
+): Promise<{
+  success: boolean;
+  request?: Request;
+  analysis?: Analysis;
+  view?: View;
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!viewId || typeof viewId !== 'string') {
+      return { success: false, error: 'Invalid view ID provided' };
+    }
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, error: 'Invalid user ID provided' };
+    }
+
+    // Get the view and validate it belongs to the user
+    const existingView = await prisma.view.findUnique({
+      where: { id: viewId }
+    });
+
+    if (!existingView) {
+      return { success: false, error: 'View not found' };
+    }
+
+    if (existingView.userId !== userId) {
+      return { success: false, error: 'View does not belong to user' };
+    }
+
+    // Check if view already has an analysis
+    if (existingView.analysisIds.length > 0) {
+      return { success: false, error: 'View already has analysis' };
+    }
+
+    // Rate limiting check - look for requests in the last hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentRequests = await prisma.request.findMany({
+      where: {
+        userId: userId,
+        createdAt: {
+          gte: oneHourAgo
+        }
+      }
+    });
+
+    if (recentRequests.length > 0) {
+      return { 
+        success: false, 
+        error: 'Rate limit exceeded. You can only make one analysis request per hour. Please try again later.' 
+      };
+    }
+
+    // Get video record ID from view
+    const videoRecordId = existingView.videoIds[0];
+    if (!videoRecordId) {
+      return { success: false, error: 'No video associated with view' };
+    }
+
+    // Get the video record to get the YouTube ID
+    const videoRecord = await prisma.video.findUnique({
+      where: { id: videoRecordId }
+    });
+
+    if (!videoRecord) {
+      return { success: false, error: 'Video record not found' };
+    }
+
+    // Create Request record
+    const request = await prisma.request.create({
+      data: {
+        userId: userId,
+        userPrompt: userPrompt || null,
+        videoIds: [videoRecordId],
+        analysisIds: [] // Will be populated after analysis
+      }
+    });
+
+    // Trigger analysis using YouTube ID
+    const analysisResult = await analyzeVideoWithGemini(
+      videoRecord.youtubeId, // Use YouTube ID for analysis
+      request.id,
+      userId,
+      userPrompt
+    );
+
+    if (!analysisResult.success || !analysisResult.analysis) {
+      // Clean up request if analysis failed
+      await prisma.request.delete({ where: { id: request.id } });
+      return {
+        success: false,
+        error: analysisResult.error || 'Analysis failed'
+      };
+    }
+
+    const analysis = analysisResult.analysis;
+
+    // Update request with analysis ID
+    const updatedRequest = await prisma.request.update({
+      where: { id: request.id },
+      data: {
+        analysisIds: [analysis.id]
+      }
+    });
+
+    // Update view with request and analysis IDs
+    const updatedView = await prisma.view.update({
+      where: { id: viewId },
+      data: {
+        requestIds: [...existingView.requestIds, request.id],
+        analysisIds: [...existingView.analysisIds, analysis.id]
+      }
+    });
+
+    return {
+      success: true,
+      request: updatedRequest,
+      analysis,
+      view: updatedView
+    };
+
+  } catch (error) {
+    console.error('Error in requestFreeAnalysis:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Get specific analysis by ID
+ * @param analysisId - ID of the analysis to fetch
+ * @returns Analysis record or error
+ */
+export const getAnalysis = async (analysisId: string): Promise<{
+  success: boolean;
+  analysis?: Analysis;
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!analysisId || typeof analysisId !== 'string') {
+      return { success: false, error: 'Invalid analysis ID provided' };
+    }
+
+    // Get analysis record
+    const analysis = await prisma.analysis.findUnique({
+      where: { id: analysisId }
+    });
+
+    if (!analysis) {
+      return { success: false, error: 'Analysis not found' };
+    }
+
+    return { success: true, analysis };
+
+  } catch (error) {
+    console.error('Error in getAnalysis:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
       if (error.message.includes('Prisma')) {
         return { success: false, error: 'Database error occurred' };
       }
