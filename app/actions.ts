@@ -178,7 +178,17 @@ export const analyzeVideoWithGemini = async (
           {
             text: (() => {
               const durationInSeconds = parseISO8601DurationToSeconds(videoDuration);
-              const defaultPrompt = `Analyze this video comprehensively. Provide a detailed summary, identify key moments with precise timestamps, and create a concise TL;DR. Focus on main topics, important transitions, and actionable insights.\n\nIMPORTANT: This video is ${durationInSeconds} seconds long. Timestamps must be:\n1. In seconds (integers only)\n2. Sorted chronologically from earliest to latest\n3. Between 0 and ${durationInSeconds} seconds (within the actual video duration)\n4. Evenly distributed throughout the video (not clustered at the beginning)\n5. Representative of key moments, transitions, and important content changes`;
+              
+              // Generate evenly distributed timestamps for better accuracy
+              const numTimestamps = Math.min(10, Math.max(3, Math.floor(durationInSeconds / 60))); // 3-10 timestamps based on length
+              const interval = Math.floor(durationInSeconds / (numTimestamps + 1));
+              const suggestedTimestamps = [];
+              for (let i = 1; i <= numTimestamps; i++) {
+                suggestedTimestamps.push(i * interval);
+              }
+              
+              const defaultPrompt = `Analyze this video comprehensively. Provide a detailed summary and create a concise TL;DR.\n\nThis video is ${durationInSeconds} seconds long. For timestamps, analyze what happens at these specific times and provide meaningful descriptions:\n${suggestedTimestamps.map(t => `- ${t} seconds`).join('\n')}\n\nFor each timestamp, describe what's happening, any key points being made, or important transitions occurring at that moment. If nothing significant happens at a specific timestamp, describe the general content/topic being covered at that time.`;
+              
               return userPrompt 
                 ? `${defaultPrompt}\n\nAdditional instructions: ${userPrompt}`
                 : defaultPrompt;
@@ -211,16 +221,16 @@ export const analyzeVideoWithGemini = async (
                 properties: {
                   seconds: {
                     type: "INTEGER",
-                    description: "Timestamp position in seconds"
+                    description: "Timestamp position in seconds (must match one of the requested timestamps)"
                   },
                   description: {
                     type: "STRING", 
-                    description: "Description of what happens at this timestamp"
+                    description: "Description of what happens at this exact timestamp"
                   }
                 },
                 required: ["seconds", "description"]
               },
-              description: "Array of timestamp objects with time and description"
+              description: "Array of timestamp objects analyzing the requested time points"
             }
           },
           required: ["summary", "tldr", "timestamps"]
@@ -273,15 +283,28 @@ export const analyzeVideoWithGemini = async (
 
     // Transform timestamp objects into separate arrays for database storage
     const durationInSeconds = parseISO8601DurationToSeconds(videoDuration);
+    
+    // Generate the same timestamps we requested for validation
+    const numTimestamps = Math.min(10, Math.max(3, Math.floor(durationInSeconds / 60)));
+    const interval = Math.floor(durationInSeconds / (numTimestamps + 1));
+    const expectedTimestamps = new Set();
+    for (let i = 1; i <= numTimestamps; i++) {
+      expectedTimestamps.add(i * interval);
+    }
+    
     const timestampSeconds: number[] = [];
     const timestampDescriptions: string[] = [];
     
     for (const timestamp of analysisData.timestamps) {
       if (typeof timestamp.seconds === 'number' && typeof timestamp.description === 'string') {
-        // Validate timestamp is within video duration
+        // Validate timestamp is within video duration and matches expected timestamps
         if (timestamp.seconds >= 0 && timestamp.seconds <= durationInSeconds) {
           timestampSeconds.push(timestamp.seconds);
           timestampDescriptions.push(timestamp.description);
+          
+          if (!expectedTimestamps.has(timestamp.seconds)) {
+            console.warn(`Unexpected timestamp: ${timestamp.seconds}s (not in requested set)`);
+          }
         } else {
           console.warn(`Skipping out-of-bounds timestamp: ${timestamp.seconds}s (video is ${durationInSeconds}s)`);
         }
