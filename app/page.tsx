@@ -46,7 +46,7 @@ export default async function Home() {
         <header className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">TLYT</h1>
           <p className="text-muted-foreground mt-2">
-            YouTube Video Analysis with AI
+            TLYT watches YouTube so you don&apos;t have to
           </p>
         </header>
 

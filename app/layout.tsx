@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TLYT - YouTube Video Analysis",
-  description: "Analyze YouTube videos with AI-powered insights",
+  title: "TLYT - TLYT watches YouTube so you don't have to",
+  description: "TLYT watches YouTube so you don't have to",
 };
 
 export default function RootLayout({
