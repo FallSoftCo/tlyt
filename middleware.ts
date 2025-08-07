@@ -1,9 +1,6 @@
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
-export default authkitMiddleware({
-  debug: true
-  // No middlewareAuth - auth is handled in pages/components
-});
+export default authkitMiddleware();
 
 export const config = {
   matcher: [
