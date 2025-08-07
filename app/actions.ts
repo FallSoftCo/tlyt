@@ -485,16 +485,25 @@ export const submitYouTubeLinkUnauthenticated = async (
  * @param existingUserId - Optional existing user ID from cookie for upgrade scenarios
  * @returns User info, authentication status, and associated history
  */
-export const initializeUser = async (existingUserId?: string, workosUser?: { id: string; email: string; firstName: string | null; lastName: string | null } | null): Promise<{
+export const initializeUser = async (existingUserId?: string): Promise<{
   success: boolean;
   isAuthenticated: boolean;
   user?: User;
   history?: History;
   error?: string;
 }> => {
-  console.log('=== initializeUser called ===', { existingUserId, workosUser: workosUser ? { id: workosUser.id, email: workosUser.email } : null });
+  console.log('=== initializeUser called ===', { existingUserId });
   
   try {
+    // Check if user is authenticated via WorkOS
+    let workosUser = null;
+    try {
+      const authResult = await withAuth();
+      workosUser = authResult.user;
+      console.log('✅ WorkOS user found:', workosUser ? { id: workosUser.id, email: workosUser.email } : null);
+    } catch {
+      console.log('ℹ️  No WorkOS authentication found');
+    }
 
     if (workosUser) {
       // Handle authenticated user

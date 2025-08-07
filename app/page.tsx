@@ -10,61 +10,42 @@ import { ChipBalanceWidget } from '@/components/chip-balance-widget'
 
 export default async function Home() {
   const cookieStore = await cookies()
-  let userId = cookieStore.get('userId')?.value
+  const userId = cookieStore.get('userId')?.value
 
-  // Get WorkOS authentication state
-  const { user: workosUser } = await withAuth()
+  // With middleware auth enabled, user is guaranteed to be authenticated
+  await withAuth({ ensureSignedIn: true })
 
-  // Initialize user (handles both authenticated and unauthenticated cases)
-  const initResult = await initializeUser(userId, workosUser)
+  // Initialize/sync user data (guaranteed authenticated due to middleware)
+  const initResult = await initializeUser(userId)
   if (!initResult.success || !initResult.user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Error</h1>
-          <p className="text-muted-foreground mt-2">{initResult.error}</p>
-        </div>
-      </div>
-    )
+    throw new Error(`User initialization failed: ${initResult.error}`)
   }
 
-  const { user, isAuthenticated } = initResult
-  userId = user.id
-  
-  console.log('Page rendering with authentication state:', { 
-    isAuthenticated, 
-    userId: user.id,
+  const { user } = initResult
+  const finalUserId = user.id
+
+  console.log('🎉 Authenticated user page load:', { 
+    userId: finalUserId,
     workosId: user.workosId,
     email: user.email 
   })
 
   // Get user data
-  const userData = await getUserData(userId)
+  const userData = await getUserData(finalUserId)
   if (!userData.success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Error</h1>
-          <p className="text-muted-foreground mt-2">{userData.error}</p>
-        </div>
-      </div>
-    )
+    throw new Error(`Failed to load user data: ${userData.error}`)
   }
 
   const { views, videos = [], analyses = [] } = userData
 
-  // Get recent transactions for authenticated users
-  let recentTransactions: Transaction[] = []
-  if (isAuthenticated && user) {
-    const transactionsResult = await getRecentTransactions(userId, 5)
-    if (transactionsResult.success && transactionsResult.transactions) {
-      recentTransactions = transactionsResult.transactions
-    }
-  }
+  // Get recent transactions
+  const transactionsResult = await getRecentTransactions(finalUserId, 5)
+  const recentTransactions: Transaction[] = transactionsResult.success ? 
+    (transactionsResult.transactions || []) : []
 
   return (
     <div className="min-h-screen bg-background">
-      <CookieHandler userId={userId} />
+      <CookieHandler userId={finalUserId} />
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">TLYT</h1>
@@ -73,39 +54,38 @@ export default async function Home() {
           </p>
         </header>
 
-        {/* Authentication Header */}
-        <AuthHeader user={user} chipBalance={user?.chipBalance} />
+        {/* Authentication Header - only uses useAuth() hook now */}
+        <AuthHeader />
 
         <main>
-          {isAuthenticated && user && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-              <div className="lg:col-span-1">
-                <ChipBalanceWidget
-                  user={user}
-                  recentTransactions={recentTransactions}
-                />
-              </div>
-              <div className="lg:col-span-3">
-                {/* Content area for authenticated users */}
-              </div>
+          {/* Authenticated user content */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            <div className="lg:col-span-1">
+              <ChipBalanceWidget
+                user={user}
+                recentTransactions={recentTransactions}
+              />
             </div>
-          )}
+            <div className="lg:col-span-3">
+              {/* Content area for authenticated users */}
+            </div>
+          </div>
 
           {views && views.length > 0 ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Your Videos</h2>
                 <PasteButton 
-                  userId={userId}
+                  userId={finalUserId}
                 />
               </div>
               <ViewList
                 views={views}
                 videos={videos}
                 analyses={analyses}
-                userId={userId}
-                isAuthenticated={isAuthenticated}
-                chipBalance={user?.chipBalance}
+                userId={finalUserId}
+                isAuthenticated={true}
+                chipBalance={user.chipBalance}
               />
             </div>
           ) : (
@@ -115,7 +95,7 @@ export default async function Home() {
                 Get started by pasting a YouTube video link
               </p>
               <PasteButton 
-                userId={userId}
+                userId={finalUserId}
               />
             </div>
           )}

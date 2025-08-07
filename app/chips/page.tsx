@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { withAuth } from '@workos-inc/authkit-nextjs'
 import { initializeUser, getActiveChipPackages } from '../actions'
 import { ChipPackages } from '@/components/chip-packages'
 import { AuthHeader } from '@/components/auth-header'
@@ -10,51 +11,16 @@ export default async function ChipsPage() {
   const cookieStore = await cookies()
   const userId = cookieStore.get('userId')?.value
 
-  // Initialize user (handles both authenticated and unauthenticated cases)
+  // With middleware auth enabled, user is guaranteed to be authenticated
+  await withAuth({ ensureSignedIn: true })
+
+  // Initialize/sync user data
   const initResult = await initializeUser(userId)
   if (!initResult.success || !initResult.user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-destructive">Error</h1>
-          <p className="text-muted-foreground mt-2">{initResult.error}</p>
-        </div>
-      </div>
-    )
+    throw new Error(`User initialization failed: ${initResult.error}`)
   }
 
-  const { user, isAuthenticated } = initResult
-
-  // Redirect unauthenticated users
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
-          <header className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">TLYT</h1>
-            <p className="text-muted-foreground mt-2">
-              TLYT watches YouTube so you don&apos;t have to
-            </p>
-          </header>
-
-          <AuthHeader user={user} chipBalance={user?.chipBalance} />
-
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-4">Sign In Required</h2>
-            <p className="text-muted-foreground mb-6">
-              You need to sign in to purchase chips
-            </p>
-            <Link href="/">
-              <Button variant="outline">
-                <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                Back to Home
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const { user } = initResult
 
   // Get available chip packages
   const packagesResult = await getActiveChipPackages()
@@ -80,7 +46,7 @@ export default async function ChipsPage() {
           </div>
         </header>
 
-        <AuthHeader user={user} chipBalance={user?.chipBalance} />
+        <AuthHeader />
 
         <main>
           <div className="mb-8">
