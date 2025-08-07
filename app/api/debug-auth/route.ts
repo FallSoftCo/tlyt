@@ -5,6 +5,13 @@ export async function GET() {
   try {
     const { user } = await withAuth();
     
+    if (!user) {
+      return NextResponse.json({
+        authenticated: false,
+        error: 'No user found'
+      });
+    }
+    
     return NextResponse.json({
       authenticated: true,
       user: {
