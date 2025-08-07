@@ -15,12 +15,15 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  workosId  String?  @unique @map("workos_id")
-  email     String?  @unique
-  name      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(cuid())
+  workosId    String?  @unique @map("workos_id")
+  email       String?  @unique
+  name        String?
+  chipBalance Int      @default(0) @map("chip_balance")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  transactions Transaction[]
 
   @@map("users")
 }
@@ -101,4 +104,47 @@ model History {
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("histories")
+}
+
+model ChipPackage {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  chipAmount  Int      @map("chip_amount")
+  priceUsd    Int      @map("price_usd") // Price in cents
+  stripePriceId String @unique @map("stripe_price_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  transactions Transaction[]
+
+  @@map("chip_packages")
+}
+
+model Transaction {
+  id            String          @id @default(cuid())
+  userId        String          @map("user_id")
+  type          TransactionType
+  chipAmount    Int             @map("chip_amount") // Positive for purchases, negative for spending
+  description   String
+  stripeSessionId String?       @unique @map("stripe_session_id") // For purchases
+  videoId       String?         @map("video_id") // For analysis spending
+  packageId     String?         @map("package_id") // For purchases
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  user    User         @relation(fields: [userId], references: [id])
+  package ChipPackage? @relation(fields: [packageId], references: [id])
+
+  @@map("transactions")
+}
+
+enum TransactionType {
+  PURCHASE
+  DEDUCTION
+  REFUND
+  ADMIN_CREDIT
+  ADMIN_DEBIT
 }

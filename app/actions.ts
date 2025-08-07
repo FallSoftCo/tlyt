@@ -12,7 +12,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '../lib/prisma';
 import { extractVideoId, fetchVideoMetadata, mapYouTubeDataToVideo, parseISO8601DurationToSeconds } from '../lib/youtube';
 import { logger } from '../lib/logger';
-import type { Video, Analysis, View, User, History, Request } from '../lib/generated/prisma';
+import type { Video, Analysis, View, User, History, Request, Transaction, ChipPackage } from '../lib/generated/prisma';
 
 // WorkOS Authentication functions
 export const handleSignOutAction = async () => {
@@ -1036,6 +1036,442 @@ export const getAnalysis = async (analysisId: string): Promise<{
 
   } catch (error) {
     console.error('Error in getAnalysis:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Get recent transactions for a user
+ * @param userId - User ID to get transactions for
+ * @param limit - Number of transactions to return (default: 10)
+ * @returns Recent transactions or error
+ */
+export const getRecentTransactions = async (
+  userId: string,
+  limit: number = 10
+): Promise<{
+  success: boolean;
+  transactions?: Transaction[];
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, error: 'Invalid user ID provided' };
+    }
+
+    if (limit < 1 || limit > 100) {
+      return { success: false, error: 'Limit must be between 1 and 100' };
+    }
+
+    // Get recent transactions
+    const transactions = await prisma.transaction.findMany({
+      where: { userId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        package: true
+      }
+    });
+
+    return { success: true, transactions };
+
+  } catch (error) {
+    console.error('Error in getRecentTransactions:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Get all active chip packages
+ * @returns Active chip packages or error
+ */
+export const getActiveChipPackages = async (): Promise<{
+  success: boolean;
+  packages?: ChipPackage[];
+  error?: string;
+}> => {
+  try {
+    // Get active packages sorted by sort order
+    const packages = await prisma.chipPackage.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' }
+    });
+
+    return { success: true, packages };
+
+  } catch (error) {
+    console.error('Error in getActiveChipPackages:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Check if user has sufficient chips for analysis
+ * @param userId - User ID to check
+ * @param chipCost - Number of chips required
+ * @returns Whether user has sufficient chips
+ */
+export const checkChipBalance = async (
+  userId: string,
+  chipCost: number
+): Promise<{
+  success: boolean;
+  hasSufficientChips?: boolean;
+  currentBalance?: number;
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, error: 'Invalid user ID provided' };
+    }
+
+    if (chipCost < 1 || !Number.isInteger(chipCost)) {
+      return { success: false, error: 'Invalid chip cost provided' };
+    }
+
+    // Get user's current chip balance
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { chipBalance: true }
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    const hasSufficientChips = user.chipBalance >= chipCost;
+
+    return {
+      success: true,
+      hasSufficientChips,
+      currentBalance: user.chipBalance
+    };
+
+  } catch (error) {
+    console.error('Error in checkChipBalance:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Deduct chips from user balance and create transaction record
+ * @param userId - User ID to deduct chips from
+ * @param chipAmount - Number of chips to deduct
+ * @param description - Description of the transaction
+ * @param videoId - Optional video ID if for analysis
+ * @returns Transaction record or error
+ */
+export const deductChips = async (
+  userId: string,
+  chipAmount: number,
+  description: string,
+  videoId?: string
+): Promise<{
+  success: boolean;
+  transaction?: Transaction;
+  newBalance?: number;
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, error: 'Invalid user ID provided' };
+    }
+
+    if (chipAmount < 1 || !Number.isInteger(chipAmount)) {
+      return { success: false, error: 'Invalid chip amount provided' };
+    }
+
+    if (!description || typeof description !== 'string') {
+      return { success: false, error: 'Invalid description provided' };
+    }
+
+    // Use transaction to ensure atomicity
+    const result = await prisma.$transaction(async (tx) => {
+      // Get current user balance
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { chipBalance: true }
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (user.chipBalance < chipAmount) {
+        throw new Error('Insufficient chip balance');
+      }
+
+      // Update user balance
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          chipBalance: user.chipBalance - chipAmount
+        }
+      });
+
+      // Create transaction record
+      const transaction = await tx.transaction.create({
+        data: {
+          userId,
+          type: 'DEDUCTION',
+          chipAmount: -chipAmount, // Negative for spending
+          description,
+          videoId
+        }
+      });
+
+      return { transaction, newBalance: updatedUser.chipBalance };
+    });
+
+    return {
+      success: true,
+      transaction: result.transaction,
+      newBalance: result.newBalance
+    };
+
+  } catch (error) {
+    console.error('Error in deductChips:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message === 'Insufficient chip balance') {
+        return { success: false, error: 'Insufficient chip balance' };
+      }
+      if (error.message === 'User not found') {
+        return { success: false, error: 'User not found' };
+      }
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Request analysis for authenticated users (chip-based)
+ * Checks user authentication, chip balance, deducts chips, creates Request record, 
+ * triggers analysis, and updates View atomically
+ * @param viewId - ID of the view to analyze
+ * @param userId - User ID making the request
+ * @param userPrompt - Optional additional instructions from user
+ * @returns Request and Analysis records or error
+ */
+export const requestAnalysisAuthenticated = async (
+  viewId: string,
+  userId: string,
+  userPrompt?: string
+): Promise<{
+  success: boolean;
+  request?: Request;
+  analysis?: Analysis;
+  view?: View;
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!viewId || typeof viewId !== 'string') {
+      return { success: false, error: 'Invalid view ID provided' };
+    }
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, error: 'Invalid user ID provided' };
+    }
+
+    // Check if user is authenticated
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { workosId: true, chipBalance: true }
+    });
+
+    if (!user) {
+      return { success: false, error: 'User not found' };
+    }
+
+    if (!user.workosId) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    // Get the view and validate it belongs to the user
+    const existingView = await prisma.view.findUnique({
+      where: { id: viewId }
+    });
+
+    if (!existingView) {
+      return { success: false, error: 'View not found' };
+    }
+
+    if (existingView.userId !== userId) {
+      return { success: false, error: 'View does not belong to user' };
+    }
+
+    // Check if view already has an analysis
+    if (existingView.analysisIds.length > 0) {
+      return { success: false, error: 'View already has analysis' };
+    }
+
+    // Get video record to determine chip cost
+    const videoRecordId = existingView.videoIds[0];
+    if (!videoRecordId) {
+      return { success: false, error: 'No video associated with view' };
+    }
+
+    const videoRecord = await prisma.video.findUnique({
+      where: { id: videoRecordId }
+    });
+
+    if (!videoRecord) {
+      return { success: false, error: 'Video record not found' };
+    }
+
+    const chipCost = videoRecord.chipCost;
+
+    // Check chip balance
+    if (user.chipBalance < chipCost) {
+      const needed = chipCost - user.chipBalance;
+      return { 
+        success: false, 
+        error: `You need ${needed} more chip${needed !== 1 ? 's' : ''} to analyze this video. You have ${user.chipBalance} chip${user.chipBalance !== 1 ? 's' : ''} but need ${chipCost}.` 
+      };
+    }
+
+    // Deduct chips first (before analysis to prevent duplicate charges)
+    const deductResult = await deductChips(
+      userId, 
+      chipCost, 
+      `Video analysis: ${videoRecord.title}`, 
+      videoRecord.id
+    );
+
+    if (!deductResult.success) {
+      return { 
+        success: false, 
+        error: deductResult.error || 'Failed to deduct chips' 
+      };
+    }
+
+    // Create Request record
+    const request = await prisma.request.create({
+      data: {
+        userId: userId,
+        userPrompt: userPrompt || null,
+        videoIds: [videoRecordId],
+        analysisIds: [] // Will be populated after analysis
+      }
+    });
+
+    // Trigger analysis using YouTube ID
+    const analysisResult = await analyzeVideoWithGemini(
+      videoRecord.youtubeId, // Use YouTube ID for analysis
+      request.id,
+      userId,
+      videoRecord.duration, // Pass video duration
+      userPrompt
+    );
+
+    if (!analysisResult.success || !analysisResult.analysis) {
+      // Analysis failed - refund chips atomically
+      await prisma.$transaction(async (tx) => {
+        // Refund chips to user
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            chipBalance: { increment: chipCost }
+          }
+        });
+        
+        // Create refund transaction record
+        await tx.transaction.create({
+          data: {
+            userId,
+            type: 'REFUND',
+            chipAmount: chipCost,
+            description: `Refund: Analysis failed for ${videoRecord.title}`,
+            videoId: videoRecord.id
+          }
+        });
+      });
+
+      // Clean up request
+      await prisma.request.delete({ where: { id: request.id } });
+      
+      return {
+        success: false,
+        error: analysisResult.error || 'Analysis failed (chips refunded)'
+      };
+    }
+
+    const analysis = analysisResult.analysis;
+
+    // Update request with analysis ID
+    const updatedRequest = await prisma.request.update({
+      where: { id: request.id },
+      data: {
+        analysisIds: [analysis.id]
+      }
+    });
+
+    // Update view with request and analysis IDs
+    const updatedView = await prisma.view.update({
+      where: { id: viewId },
+      data: {
+        requestIds: [...existingView.requestIds, request.id],
+        analysisIds: [...existingView.analysisIds, analysis.id]
+      }
+    });
+
+    // Revalidate the page to show fresh data
+    try {
+      revalidatePath('/');
+    } catch (error) {
+      // Continue anyway - don't fail the whole operation if revalidation fails
+      logger.error(`Error revalidating path: ${error}`);
+    }
+    
+    return {
+      success: true,
+      request: updatedRequest,
+      analysis,
+      view: updatedView
+    };
+
+  } catch (error) {
+    console.error('Error in requestAnalysisAuthenticated:', error);
     
     // Handle specific error types
     if (error instanceof Error) {

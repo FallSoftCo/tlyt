@@ -8,10 +8,12 @@ interface ViewListProps {
   videos: Video[]
   analyses: Analysis[]
   userId: string
+  isAuthenticated?: boolean
+  chipBalance?: number
   onAnalysisRequested?: () => void
 }
 
-export function ViewList({ views, videos, analyses, userId, onAnalysisRequested }: ViewListProps) {
+export function ViewList({ views, videos, analyses, userId, isAuthenticated = false, chipBalance, onAnalysisRequested }: ViewListProps) {
   // Create lookup maps for efficient data retrieval
   const videoMap = new Map(videos.map(video => [video.id, video]))
   const analysisMap = new Map(analyses.map(analysis => [analysis.id, analysis]))
@@ -54,6 +56,8 @@ export function ViewList({ views, videos, analyses, userId, onAnalysisRequested 
             video={video}
             analysis={analysis}
             userId={userId}
+            isAuthenticated={isAuthenticated}
+            chipBalance={chipBalance}
             onAnalysisRequested={onAnalysisRequested}
           />
         )

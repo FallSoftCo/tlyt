@@ -1,28 +1,31 @@
 import { cookies } from 'next/headers'
-import { getUserData, initializeUser } from './actions'
+import { getUserData, initializeUser, getRecentTransactions } from './actions'
+import type { Transaction } from '@/lib/generated/prisma'
 import { PasteButton } from '@/components/paste-button'
 import { ViewList } from '@/components/view-list'
 import { CookieHandler } from '@/components/cookie-handler'
+import { AuthHeader } from '@/components/auth-header'
+import { ChipBalanceWidget } from '@/components/chip-balance-widget'
 
 export default async function Home() {
   const cookieStore = await cookies()
   let userId = cookieStore.get('userId')?.value
 
-  // If no userId, create a new unauthenticated user (cookies will be set client-side)
-  if (!userId) {
-    const result = await initializeUser()
-    if (!result.success || !result.user) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-destructive">Error</h1>
-            <p className="text-muted-foreground mt-2">{result.error}</p>
-          </div>
+  // Initialize user (handles both authenticated and unauthenticated cases)
+  const initResult = await initializeUser(userId)
+  if (!initResult.success || !initResult.user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-destructive">Error</h1>
+          <p className="text-muted-foreground mt-2">{initResult.error}</p>
         </div>
-      )
-    }
-    userId = result.user.id
+      </div>
+    )
   }
+
+  const { user, isAuthenticated } = initResult
+  userId = user.id
 
   // Get user data
   const userData = await getUserData(userId)
@@ -39,6 +42,15 @@ export default async function Home() {
 
   const { views, videos = [], analyses = [] } = userData
 
+  // Get recent transactions for authenticated users
+  let recentTransactions: Transaction[] = []
+  if (isAuthenticated && user) {
+    const transactionsResult = await getRecentTransactions(userId, 5)
+    if (transactionsResult.success && transactionsResult.transactions) {
+      recentTransactions = transactionsResult.transactions
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <CookieHandler userId={userId} />
@@ -50,7 +62,27 @@ export default async function Home() {
           </p>
         </header>
 
+        {/* Authentication Header */}
+        <AuthHeader user={user} isAuthenticated={isAuthenticated} />
+
         <main>
+          {isAuthenticated && user && (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+              <div className="lg:col-span-1">
+                <ChipBalanceWidget
+                  user={user}
+                  recentTransactions={recentTransactions}
+                  onBuyChips={() => {
+                    window.location.href = '/chips'
+                  }}
+                />
+              </div>
+              <div className="lg:col-span-3">
+                {/* Content area for authenticated users */}
+              </div>
+            </div>
+          )}
+
           {views && views.length > 0 ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -64,6 +96,8 @@ export default async function Home() {
                 videos={videos}
                 analyses={analyses}
                 userId={userId}
+                isAuthenticated={isAuthenticated}
+                chipBalance={user?.chipBalance}
               />
             </div>
           ) : (

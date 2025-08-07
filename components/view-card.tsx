@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ClockIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
-import { updateViewExpansion, requestFreeAnalysis } from '@/app/actions'
+import { updateViewExpansion, requestFreeAnalysis, requestAnalysisAuthenticated } from '@/app/actions'
 import { AnalysisLoading } from '@/components/analysis-loading'
 import type { View, Video, Analysis } from '@/lib/generated/prisma'
 
@@ -16,10 +16,12 @@ interface ViewCardProps {
   video: Video
   analysis?: Analysis
   userId: string
+  isAuthenticated?: boolean
+  chipBalance?: number
   onAnalysisRequested?: () => void
 }
 
-export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }: ViewCardProps) {
+export function ViewCard({ view, video, analysis, userId, isAuthenticated = false, chipBalance, onAnalysisRequested }: ViewCardProps) {
   const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(view.isExpanded)
   const [isRequestingAnalysis, setIsRequestingAnalysis] = useState(false)
@@ -65,7 +67,10 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
       setIsRequestingAnalysis(true)
       setAnalysisError(null)
       
-      const result = await requestFreeAnalysis(view.id, userId)
+      // Use appropriate analysis function based on authentication status
+      const result = isAuthenticated 
+        ? await requestAnalysisAuthenticated(view.id, userId)
+        : await requestFreeAnalysis(view.id, userId)
       
       if (!result.success) {
         setAnalysisError(result.error || 'Failed to request analysis')
@@ -88,6 +93,18 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
 
   const getYouTubeUrl = () => `https://www.youtube.com/watch?v=${video.youtubeId}`
   const getEmbedUrl = () => `https://www.youtube.com/embed/${video.youtubeId}?enablejsapi=1`
+
+  // Check if user has sufficient chips for analysis
+  const hasSufficientChips = () => {
+    if (!isAuthenticated || chipBalance === undefined) return true
+    return chipBalance >= video.chipCost
+  }
+
+  const getInsufficientChipsMessage = () => {
+    if (!isAuthenticated || chipBalance === undefined) return null
+    const needed = video.chipCost - chipBalance
+    return `You need ${needed} more chip${needed !== 1 ? 's' : ''} to analyze this video.`
+  }
 
   const seekToTimestamp = (timestamp: number) => {
     if (iframeRef.current) {
@@ -206,8 +223,16 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
                 <div>
                   <p className="font-medium mb-1">Analysis</p>
                   <p className="text-sm text-muted-foreground">
-                    This video hasn&apos;t been analyzed yet
+                    {isAuthenticated 
+                      ? `This video hasn't been analyzed yet. Costs ${video.chipCost} chip${video.chipCost !== 1 ? 's' : ''}.`
+                      : "This video hasn't been analyzed yet"
+                    }
                   </p>
+                  {isAuthenticated && chipBalance !== undefined && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Your balance: {chipBalance} chip{chipBalance !== 1 ? 's' : ''}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge variant="secondary">
@@ -215,10 +240,16 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
                   </Badge>
                   <Button 
                     onClick={handleRequestAnalysis}
-                    disabled={isRequestingAnalysis}
+                    disabled={isRequestingAnalysis || (isAuthenticated && !hasSufficientChips())}
                     size="sm"
+                    variant={isAuthenticated && !hasSufficientChips() ? "outline" : "default"}
                   >
-                    Request Analysis
+                    {isAuthenticated && !hasSufficientChips() 
+                      ? 'Insufficient Chips' 
+                      : isAuthenticated 
+                        ? 'Analyze Video' 
+                        : 'Request Analysis'
+                    }
                   </Button>
                 </div>
               </div>
@@ -226,6 +257,21 @@ export function ViewCard({ view, video, analysis, userId, onAnalysisRequested }:
                 <p className="text-sm text-destructive mt-2">
                   {analysisError}
                 </p>
+              )}
+              {isAuthenticated && !hasSufficientChips() && (
+                <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800 mb-2">
+                    <span className="font-medium">Insufficient chips!</span>
+                    <br />
+                    {getInsufficientChipsMessage()}
+                  </p>
+                  <a 
+                    href="/chips" 
+                    className="text-sm text-amber-700 underline hover:text-amber-900"
+                  >
+                    Buy more chips →
+                  </a>
+                </div>
               )}
             </div>
           )}
