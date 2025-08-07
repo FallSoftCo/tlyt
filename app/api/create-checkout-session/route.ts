@@ -1,5 +1,6 @@
 // app/api/create-checkout-session/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from '@workos-inc/authkit-nextjs';
 import Stripe from "stripe";
 
 // Skip stripe initialization if no key is provided (for testing)
@@ -17,7 +18,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { items, userId, workosId } = await request.json();
+    // Verify user is authenticated
+    const { user } = await withAuth();
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const { items } = await request.json();
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "No items in cart" }, { status: 400 });
@@ -37,7 +44,7 @@ export async function POST(request: NextRequest) {
     // The customer creation and association will happen in webhook handling
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      client_reference_id: workosId || userId || '', // Use workosId for authenticated users, fallback to userId
+      client_reference_id: user.id, // Use WorkOS user ID directly
       line_items: items.map((item: { priceId: string; quantity: number }) => ({
         price: item.priceId,
         quantity: item.quantity,

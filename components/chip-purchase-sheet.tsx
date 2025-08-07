@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@workos-inc/authkit-nextjs/components'
 import {
   Sheet,
   SheetContent,
@@ -20,21 +19,20 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CoinsIcon, ShoppingCart, SparklesIcon, UserPlus, LogIn } from 'lucide-react'
-import type { ChipPackage, User } from '@/lib/generated/prisma'
+import type { ChipPackage } from '@/lib/generated/prisma'
 import { getSignInUrlAction, getSignUpUrlAction } from '@/app/actions'
 
 interface ChipPurchaseSheetProps {
   packages: ChipPackage[]
-  user?: User | null
+  canCheckout: boolean
   trigger: React.ReactNode
 }
 
-export function ChipPurchaseSheet({ packages, user, trigger }: ChipPurchaseSheetProps) {
-  const { user: workosUser } = useAuth()
+export function ChipPurchaseSheet({ packages, canCheckout, trigger }: ChipPurchaseSheetProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [selectedPackageId, setSelectedPackageId] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
-  const [checkoutError, setCheckoutError] = useState('')
+  const [error, setError] = useState('')
 
   const selectedPackage = packages.find(pkg => pkg.id === selectedPackageId)
   
@@ -61,20 +59,8 @@ export function ChipPurchaseSheet({ packages, user, trigger }: ChipPurchaseSheet
   const handleCheckout = async () => {
     if (!selectedPackage) return
 
-    if (!workosUser) {
-      // Redirect to sign up for unauthenticated users
-      try {
-        const signUpUrl = await getSignUpUrlAction()
-        window.location.href = signUpUrl
-        return
-      } catch {
-        setCheckoutError('Failed to redirect to sign up')
-        return
-      }
-    }
-
     setIsLoading(true)
-    setCheckoutError('')
+    setError('')
 
     try {
       const response = await fetch('/api/create-checkout-session', {
@@ -86,9 +72,7 @@ export function ChipPurchaseSheet({ packages, user, trigger }: ChipPurchaseSheet
           items: [{
             priceId: selectedPackage.stripePriceId,
             quantity: 1
-          }],
-          userId: user?.id,
-          workosId: workosUser?.id
+          }]
         }),
       })
 
@@ -101,9 +85,9 @@ export function ChipPurchaseSheet({ packages, user, trigger }: ChipPurchaseSheet
       if (url) {
         window.location.href = url
       }
-    } catch (error) {
-      console.error('Error creating checkout session:', error)
-      setCheckoutError(error instanceof Error ? error.message : 'Failed to start checkout process')
+    } catch (err) {
+      console.error('Error creating checkout session:', err)
+      setError(err instanceof Error ? err.message : 'Failed to start checkout process')
     } finally {
       setIsLoading(false)
     }
@@ -116,7 +100,7 @@ export function ChipPurchaseSheet({ packages, user, trigger }: ChipPurchaseSheet
         : await getSignUpUrlAction()
       window.location.href = url
     } catch {
-      setCheckoutError(`Failed to redirect to ${action}`)
+      setError(`Failed to redirect to ${action}`)
     }
   }
 
@@ -132,85 +116,23 @@ export function ChipPurchaseSheet({ packages, user, trigger }: ChipPurchaseSheet
       <SheetContent className="w-full max-w-[400px] sm:max-w-md flex flex-col h-full">
         <SheetHeader className="flex-shrink-0">
           <SheetTitle>
-            {workosUser ? 'Buy Processing Chips' : 'Chip Pricing'}
+            {canCheckout ? 'Buy Processing Chips' : 'Chip Pricing'}
           </SheetTitle>
         </SheetHeader>
         
         <div className="flex-1 overflow-y-auto py-4">
-          {!workosUser ? (
-            // Unauthenticated user view - show pricing transparency
-            <div className="space-y-4">
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  See our chip pricing. Sign in to purchase and get unlimited video analysis.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {packages
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map((pkg) => (
-                    <Card key={pkg.id} className={`relative ${
-                      bestValue?.id === pkg.id ? 'border-primary' : ''
-                    }`}>
-                      {bestValue?.id === pkg.id && (
-                        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-                          <Badge className="bg-primary text-primary-foreground">
-                            <SparklesIcon className="w-3 h-3 mr-1" />
-                            Best Value
-                          </Badge>
-                        </div>
-                      )}
-                      
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <CoinsIcon className="w-4 h-4 text-amber-500" />
-                            <span className="font-semibold">{pkg.name}</span>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold">{formatPrice(pkg.priceUsd)}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {calculateValuePerChip(pkg.priceUsd, pkg.chipAmount)}
-                            </div>
-                          </div>
-                        </div>
-                        {pkg.description && (
-                          <p className="text-sm text-muted-foreground">{pkg.description}</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))
+          <div className="space-y-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                {canCheckout 
+                  ? '1 chip per video processed. Choose your package below.'
+                  : 'See our chip pricing. Sign in to purchase and get unlimited video analysis.'
                 }
-              </div>
-
-              <div className="space-y-2 pt-4 border-t">
-                <Button 
-                  onClick={() => handleAuthAction('signup')} 
-                  className="w-full"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Sign Up to Purchase
-                </Button>
-                <Button 
-                  onClick={() => handleAuthAction('signin')} 
-                  variant="outline" 
-                  className="w-full"
-                >
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Sign In
-                </Button>
-              </div>
+              </p>
             </div>
-          ) : (
-            // Authenticated user view - full purchase flow
-            <div className="space-y-4">
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  1 chip per video processed. Choose your package below.
-                </p>
-              </div>
 
+            {canCheckout ? (
+              // Authenticated user - show selection and checkout
               <div className="space-y-3">
                 <Select value={selectedPackageId} onValueChange={setSelectedPackageId}>
                   <SelectTrigger>
@@ -273,31 +195,94 @@ export function ChipPurchaseSheet({ packages, user, trigger }: ChipPurchaseSheet
                     </CardContent>
                   </Card>
                 )}
+
+                {error && (
+                  <p className="text-sm text-red-500 text-center">
+                    {error}
+                  </p>
+                )}
+
+                <Button 
+                  onClick={handleCheckout}
+                  disabled={!selectedPackage || isLoading}
+                  className="w-full"
+                  size="lg"
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  {isLoading ? 'Processing...' : 
+                    selectedPackage ? `Checkout - ${formatPrice(selectedPackage.priceUsd)}` : 'Select a Package'
+                  }
+                </Button>
+
+                <div className="text-xs text-center text-muted-foreground">
+                  Instant delivery • Secure payment via Stripe
+                </div>
               </div>
-
-              {checkoutError && (
-                <p className="text-sm text-red-500 text-center">
-                  {checkoutError}
-                </p>
-              )}
-
-              <Button 
-                onClick={handleCheckout}
-                disabled={!selectedPackage || isLoading}
-                className="w-full"
-                size="lg"
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                {isLoading ? 'Processing...' : 
-                  selectedPackage ? `Checkout - ${formatPrice(selectedPackage.priceUsd)}` : 'Select a Package'
+            ) : (
+              // Unauthenticated user - show pricing and sign up options
+              <div className="space-y-3">
+                {packages
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .map((pkg) => (
+                    <Card key={pkg.id} className={`relative ${
+                      bestValue?.id === pkg.id ? 'border-primary' : ''
+                    }`}>
+                      {bestValue?.id === pkg.id && (
+                        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                          <Badge className="bg-primary text-primary-foreground">
+                            <SparklesIcon className="w-3 h-3 mr-1" />
+                            Best Value
+                          </Badge>
+                        </div>
+                      )}
+                      
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <CoinsIcon className="w-4 h-4 text-amber-500" />
+                            <span className="font-semibold">{pkg.name}</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold">{formatPrice(pkg.priceUsd)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {calculateValuePerChip(pkg.priceUsd, pkg.chipAmount)}
+                            </div>
+                          </div>
+                        </div>
+                        {pkg.description && (
+                          <p className="text-sm text-muted-foreground">{pkg.description}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
                 }
-              </Button>
 
-              <div className="text-xs text-center text-muted-foreground">
-                Instant delivery • Secure payment via Stripe
+                {error && (
+                  <p className="text-sm text-red-500 text-center">
+                    {error}
+                  </p>
+                )}
+
+                <div className="space-y-2 pt-4 border-t">
+                  <Button 
+                    onClick={() => handleAuthAction('signup')} 
+                    className="w-full"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Sign Up to Purchase
+                  </Button>
+                  <Button 
+                    onClick={() => handleAuthAction('signin')} 
+                    variant="outline" 
+                    className="w-full"
+                  >
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Sign In
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

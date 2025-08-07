@@ -84,7 +84,7 @@ export default async function Home() {
               <div className="flex justify-center">
                 <ChipPurchaseSheet
                   packages={packages}
-                  user={user}
+                  canCheckout={true}
                   trigger={
                     <Button size="lg" className="w-full max-w-md">
                       <ShoppingCart className="h-4 w-4 mr-2" />

@@ -66,7 +66,7 @@ export default async function TrialPage() {
           <div className="mb-6">
             <ChipPurchaseSheet
               packages={packages}
-              user={null}
+              canCheckout={false}
               trigger={
                 <Button variant="outline" className="w-full">
                   <DollarSign className="h-4 w-4 mr-2" />
