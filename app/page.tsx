@@ -83,7 +83,6 @@ export default async function Home() {
                 <h2 className="text-xl font-semibold">Your Videos</h2>
                 <PasteButton 
                   userId={finalUserId}
-                  isAuthenticated={true}
                 />
               </div>
               <ViewList
@@ -103,7 +102,6 @@ export default async function Home() {
               </p>
               <PasteButton 
                 userId={finalUserId}
-                isAuthenticated={true}
               />
             </div>
           )}

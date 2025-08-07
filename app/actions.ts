@@ -368,74 +368,6 @@ export const analyzeVideoWithGemini = async (
   }
 }
 
-/**
- * Submit YouTube link for authenticated users (no rate limiting)
- * Creates video and view models without rate limits
- * @param youtubeUrl - YouTube video URL
- * @param userId - Authenticated user ID
- * @returns View and Video models or error
- */
-export const submitYouTubeLinkAuthenticated = async (
-  youtubeUrl: string,
-  userId: string
-): Promise<{
-  success: boolean;
-  view?: View;
-  video?: Video;
-  error?: string;
-}> => {
-  try {
-    // Input validation
-    if (!youtubeUrl || typeof youtubeUrl !== 'string') {
-      return { success: false, error: 'Invalid YouTube URL provided' };
-    }
-    if (!userId || typeof userId !== 'string') {
-      return { success: false, error: 'Invalid user ID provided' };
-    }
-
-    // No rate limiting for authenticated users
-
-    // Process video using existing upsert action
-    const videoResult = await upsertVideoAction(youtubeUrl);
-    if (!videoResult.success || !videoResult.video) {
-      return { 
-        success: false, 
-        error: videoResult.error || 'Failed to process video' 
-      };
-    }
-
-    const video = videoResult.video;
-
-    // Create view for authenticated user
-    const view = await prisma.view.create({
-      data: {
-        videoIds: [video.id],
-        userId: userId,
-        isExpanded: false,
-        analysisIds: []
-      }
-    });
-
-    // Create a request record
-    await prisma.request.create({
-      data: {
-        userId: userId,
-        videoIds: [video.id],
-        analysisIds: []
-      }
-    });
-
-    return {
-      success: true,
-      view,
-      video
-    };
-
-  } catch (error) {
-    console.error('Error in submitYouTubeLinkAuthenticated:', error);
-    return { success: false, error: 'An unexpected error occurred' };
-  }
-};
 
 /**
  * Submit YouTube link for unauthenticated users (trial users with rate limiting)
@@ -547,55 +479,6 @@ export const submitYouTubeLinkUnauthenticated = async (
   }
 }
 
-/**
- * Get or create trial user ID for unauthenticated users
- * @param existingUserId - Optional existing user ID from cookie
- * @returns Trial user ID and whether it's a new user
- */
-export const getTrialUserId = async (existingUserId?: string): Promise<{
-  success: boolean;
-  userId?: string;
-  isNewUser?: boolean;
-  error?: string;
-}> => {
-  try {
-    // If we have an existing user ID, use it
-    if (existingUserId) {
-      const existingUser = await prisma.user.findUnique({
-        where: { id: existingUserId }
-      });
-
-      if (existingUser && !existingUser.workosId) {
-        // This is a trial user, return it
-        return {
-          success: true,
-          userId: existingUser.id,
-          isNewUser: false
-        };
-      }
-    }
-
-    // Create a new trial user (workosId is null for trial users)
-    const newUser = await prisma.user.create({
-      data: {
-        chipBalance: 0
-      }
-    });
-
-    return {
-      success: true,
-      userId: newUser.id,
-      isNewUser: true
-    };
-
-  } catch (error) {
-    logger.error(`Error getting trial user: ${error}`);
-    return {
-      success: false,
-      error: 'Failed to get trial user'
-    };
-  }
-};
 
 /**
  * Initialize user - checks WorkOS authentication and creates/updates User and History records
