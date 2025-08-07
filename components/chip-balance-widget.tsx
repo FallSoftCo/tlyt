@@ -10,16 +10,15 @@ import type { User, Transaction } from '@/lib/generated/prisma'
 interface ChipBalanceWidgetProps {
   user: User
   recentTransactions: Transaction[]
-  onBuyChips: () => void
 }
 
-export function ChipBalanceWidget({ user, recentTransactions, onBuyChips }: ChipBalanceWidgetProps) {
+export function ChipBalanceWidget({ user, recentTransactions }: ChipBalanceWidgetProps) {
   const [isLoading, setIsLoading] = useState(false)
 
   const handleBuyChips = async () => {
     setIsLoading(true)
     try {
-      onBuyChips()
+      window.location.href = '/chips'
     } finally {
       setIsLoading(false)
     }

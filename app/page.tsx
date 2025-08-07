@@ -83,9 +83,6 @@ export default async function Home() {
                 <ChipBalanceWidget
                   user={user}
                   recentTransactions={recentTransactions}
-                  onBuyChips={() => {
-                    window.location.href = '/chips'
-                  }}
                 />
               </div>
               <div className="lg:col-span-3">
