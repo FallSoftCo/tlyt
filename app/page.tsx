@@ -1,13 +1,16 @@
 import { cookies } from 'next/headers'
 import { withAuth } from '@workos-inc/authkit-nextjs'
 import { redirect } from 'next/navigation'
-import { getUserData, initializeUser, getRecentTransactions } from './actions'
+import { getUserData, initializeUser, getRecentTransactions, getActiveChipPackages } from './actions'
 import type { Transaction } from '@/lib/generated/prisma'
 import { PasteButton } from '@/components/paste-button'
 import { ViewList } from '@/components/view-list'
 import { CookieHandler } from '@/components/cookie-handler'
 import { AuthHeader } from '@/components/auth-header'
 import { ChipBalanceWidget } from '@/components/chip-balance-widget'
+import { ChipPurchaseSheet } from '@/components/chip-purchase-sheet'
+import { Button } from '@/components/ui/button'
+import { ShoppingCart } from 'lucide-react'
 
 export default async function Home() {
   const cookieStore = await cookies()
@@ -49,6 +52,10 @@ export default async function Home() {
   const recentTransactions: Transaction[] = transactionsResult.success ? 
     (transactionsResult.transactions || []) : []
 
+  // Get available chip packages
+  const packagesResult = await getActiveChipPackages()
+  const packages = packagesResult.success && packagesResult.packages ? packagesResult.packages : []
+
   return (
     <div className="min-h-screen bg-background">
       <CookieHandler userId={finalUserId} />
@@ -73,7 +80,19 @@ export default async function Home() {
               />
             </div>
             <div className="lg:col-span-3">
-              {/* Content area for authenticated users */}
+              {/* Buy Chips Button */}
+              <div className="flex justify-center">
+                <ChipPurchaseSheet
+                  packages={packages}
+                  user={user}
+                  trigger={
+                    <Button size="lg" className="w-full max-w-md">
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Buy Processing Chips
+                    </Button>
+                  }
+                />
+              </div>
             </div>
           </div>
 

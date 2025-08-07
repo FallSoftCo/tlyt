@@ -11,10 +11,9 @@ interface ChipPackagesProps {
   packages: ChipPackage[]
   userId: string
   workosId?: string
-  onPackageSelected?: () => void
 }
 
-export function ChipPackages({ packages, userId, workosId, onPackageSelected }: ChipPackagesProps) {
+export function ChipPackages({ packages, userId, workosId }: ChipPackagesProps) {
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -62,7 +61,6 @@ export function ChipPackages({ packages, userId, workosId, onPackageSelected }: 
     } finally {
       setIsLoading(false)
       setSelectedPackage(null)
-      onPackageSelected?.()
     }
   }
 

@@ -1,9 +1,12 @@
 import { cookies } from 'next/headers'
-import { getUserData, initializeUser } from '../actions'
+import { getUserData, initializeUser, getActiveChipPackages } from '../actions'
 import { PasteButton } from '@/components/paste-button'
 import { ViewList } from '@/components/view-list'
 import { CookieHandler } from '@/components/cookie-handler'
 import { AuthHeader } from '@/components/auth-header'
+import { ChipPurchaseSheet } from '@/components/chip-purchase-sheet'
+import { Button } from '@/components/ui/button'
+import { DollarSign } from 'lucide-react'
 
 export default async function TrialPage() {
   const cookieStore = await cookies()
@@ -40,6 +43,10 @@ export default async function TrialPage() {
 
   const { views, videos = [], analyses = [] } = userData
 
+  // Get available chip packages for pricing transparency
+  const packagesResult = await getActiveChipPackages()
+  const packages = packagesResult.success && packagesResult.packages ? packagesResult.packages : []
+
   return (
     <div className="min-h-screen bg-background">
       <CookieHandler userId={userId} />
@@ -53,6 +60,22 @@ export default async function TrialPage() {
 
         {/* Sign up/Sign in buttons for trial users */}
         <AuthHeader />
+
+        {/* Pricing transparency for trial users */}
+        {packages.length > 0 && (
+          <div className="mb-6">
+            <ChipPurchaseSheet
+              packages={packages}
+              user={null}
+              trigger={
+                <Button variant="outline" className="w-full">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  View Pricing & Sign Up
+                </Button>
+              }
+            />
+          </div>
+        )}
 
         <main>
           {views && views.length > 0 ? (
