@@ -492,22 +492,27 @@ export const initializeUser = async (existingUserId?: string): Promise<{
   history?: History;
   error?: string;
 }> => {
+  console.log('=== initializeUser called ===', { existingUserId });
+  
   try {
     // Try to get authenticated user from WorkOS
     let workosUser = null;
     try {
+      console.log('Attempting WorkOS authentication check...');
       const authResult = await withAuth();
       workosUser = authResult.user;
       if (workosUser) {
-        console.log('WorkOS authentication successful:', { 
+        console.log('✅ WorkOS authentication successful:', { 
           userId: workosUser.id, 
           email: workosUser.email,
           firstName: workosUser.firstName 
         });
+      } else {
+        console.log('⚠️  WorkOS authResult.user is null/undefined');
       }
     } catch (error) {
       // User is not authenticated - this is expected for unauthenticated users
-      console.log('User not authenticated via WorkOS:', error instanceof Error ? error.message : 'Unknown error');
+      console.log('❌ User not authenticated via WorkOS:', error instanceof Error ? error.message : 'Unknown error');
     }
 
     if (workosUser) {
@@ -603,6 +608,13 @@ export const initializeUser = async (existingUserId?: string): Promise<{
         });
       }
 
+      console.log('🎉 Returning authenticated user:', { 
+        userId: user.id, 
+        workosId: user.workosId, 
+        email: user.email,
+        isAuthenticated: true 
+      });
+      
       return { 
         success: true, 
         isAuthenticated: true, 
