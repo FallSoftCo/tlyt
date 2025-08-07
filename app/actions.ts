@@ -369,10 +369,79 @@ export const analyzeVideoWithGemini = async (
 }
 
 /**
- * Submit YouTube link for unauthenticated users (RATE LIMITING TEMPORARILY DISABLED)
- * Creates video and view models, with 1-hour rate limit based on previous requests
+ * Submit YouTube link for authenticated users (no rate limiting)
+ * Creates video and view models without rate limits
  * @param youtubeUrl - YouTube video URL
- * @param userIdentifier - User identifier (IP address, session ID, etc.)
+ * @param userId - Authenticated user ID
+ * @returns View and Video models or error
+ */
+export const submitYouTubeLinkAuthenticated = async (
+  youtubeUrl: string,
+  userId: string
+): Promise<{
+  success: boolean;
+  view?: View;
+  video?: Video;
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!youtubeUrl || typeof youtubeUrl !== 'string') {
+      return { success: false, error: 'Invalid YouTube URL provided' };
+    }
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, error: 'Invalid user ID provided' };
+    }
+
+    // No rate limiting for authenticated users
+
+    // Process video using existing upsert action
+    const videoResult = await upsertVideoAction(youtubeUrl);
+    if (!videoResult.success || !videoResult.video) {
+      return { 
+        success: false, 
+        error: videoResult.error || 'Failed to process video' 
+      };
+    }
+
+    const video = videoResult.video;
+
+    // Create view for authenticated user
+    const view = await prisma.view.create({
+      data: {
+        videoIds: [video.id],
+        userId: userId,
+        isExpanded: false,
+        analysisIds: []
+      }
+    });
+
+    // Create a request record
+    await prisma.request.create({
+      data: {
+        userId: userId,
+        videoIds: [video.id],
+        analysisIds: []
+      }
+    });
+
+    return {
+      success: true,
+      view,
+      video
+    };
+
+  } catch (error) {
+    console.error('Error in submitYouTubeLinkAuthenticated:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+};
+
+/**
+ * Submit YouTube link for unauthenticated users (trial users with rate limiting)
+ * Creates video and view models, with 15-minute rate limit based on previous requests
+ * @param youtubeUrl - YouTube video URL
+ * @param userIdentifier - Trial user identifier
  * @returns View and Video models or error
  */
 export const submitYouTubeLinkUnauthenticated = async (
@@ -393,23 +462,23 @@ export const submitYouTubeLinkUnauthenticated = async (
       return { success: false, error: 'Invalid user identifier provided' };
     }
 
-    // Rate limiting check - TEMPORARILY DISABLED
-    // const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    // const recentRequests = await prisma.request.findMany({
-    //   where: {
-    //     userId: userIdentifier,
-    //     createdAt: {
-    //       gte: oneHourAgo
-    //     }
-    //   }
-    // });
+    // Rate limiting check for trial users (15 minutes)
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const recentRequests = await prisma.request.findMany({
+      where: {
+        userId: userIdentifier,
+        createdAt: {
+          gte: fifteenMinutesAgo
+        }
+      }
+    });
 
-    // if (recentRequests.length > 0) {
-    //   return { 
-    //     success: false, 
-    //     error: 'Rate limit exceeded. You can only make one request per hour. Please try again later.' 
-    //   };
-    // }
+    if (recentRequests.length > 0) {
+      return { 
+        success: false, 
+        error: 'Rate limit exceeded. You can only make one request per 15 minutes. Sign up for unlimited access!' 
+      };
+    }
 
     // Process video using existing upsert action
     const videoResult = await upsertVideoAction(youtubeUrl);
@@ -477,6 +546,56 @@ export const submitYouTubeLinkUnauthenticated = async (
     return { success: false, error: 'An unexpected error occurred' };
   }
 }
+
+/**
+ * Get or create trial user ID for unauthenticated users
+ * @param existingUserId - Optional existing user ID from cookie
+ * @returns Trial user ID and whether it's a new user
+ */
+export const getTrialUserId = async (existingUserId?: string): Promise<{
+  success: boolean;
+  userId?: string;
+  isNewUser?: boolean;
+  error?: string;
+}> => {
+  try {
+    // If we have an existing user ID, use it
+    if (existingUserId) {
+      const existingUser = await prisma.user.findUnique({
+        where: { id: existingUserId }
+      });
+
+      if (existingUser && !existingUser.workosId) {
+        // This is a trial user, return it
+        return {
+          success: true,
+          userId: existingUser.id,
+          isNewUser: false
+        };
+      }
+    }
+
+    // Create a new trial user (workosId is null for trial users)
+    const newUser = await prisma.user.create({
+      data: {
+        chipBalance: 0
+      }
+    });
+
+    return {
+      success: true,
+      userId: newUser.id,
+      isNewUser: true
+    };
+
+  } catch (error) {
+    logger.error(`Error getting trial user: ${error}`);
+    return {
+      success: false,
+      error: 'Failed to get trial user'
+    };
+  }
+};
 
 /**
  * Initialize user - checks WorkOS authentication and creates/updates User and History records
@@ -920,23 +1039,23 @@ export const requestFreeAnalysis = async (
       return { success: false, error: 'View already has analysis' };
     }
 
-    // Rate limiting check - TEMPORARILY DISABLED
-    // const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    // const recentRequests = await prisma.request.findMany({
-    //   where: {
-    //     userId: userId,
-    //     createdAt: {
-    //       gte: oneHourAgo
-    //     }
-    //   }
-    // });
+    // Rate limiting check for trial users (15 minutes)
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const recentRequests = await prisma.request.findMany({
+      where: {
+        userId: userId,
+        createdAt: {
+          gte: fifteenMinutesAgo
+        }
+      }
+    });
 
-    // if (recentRequests.length > 0) {
-    //   return { 
-    //     success: false, 
-    //     error: 'Rate limit exceeded. You can only make one analysis request per hour. Please try again later.' 
-    //   };
-    // }
+    if (recentRequests.length > 0) {
+      return { 
+        success: false, 
+        error: 'Rate limit exceeded. You can only make one analysis request per 15 minutes. Sign up for unlimited access!' 
+      };
+    }
 
     // Get video record ID from view
     const videoRecordId = existingView.videoIds[0];

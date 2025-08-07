@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { withAuth } from '@workos-inc/authkit-nextjs'
+import { redirect } from 'next/navigation'
 import { getUserData, initializeUser, getRecentTransactions } from './actions'
 import type { Transaction } from '@/lib/generated/prisma'
 import { PasteButton } from '@/components/paste-button'
@@ -12,8 +13,13 @@ export default async function Home() {
   const cookieStore = await cookies()
   const userId = cookieStore.get('userId')?.value
 
-  // With middleware auth enabled, user is guaranteed to be authenticated
-  await withAuth({ ensureSignedIn: true })
+  // Check if user is authenticated - if not, redirect to trial
+  const { user: workosUser } = await withAuth()
+  
+  if (!workosUser) {
+    // Unauthenticated users should use the trial experience
+    redirect('/trial')
+  }
 
   // Initialize/sync user data (guaranteed authenticated due to middleware)
   const initResult = await initializeUser(userId)
@@ -77,6 +83,7 @@ export default async function Home() {
                 <h2 className="text-xl font-semibold">Your Videos</h2>
                 <PasteButton 
                   userId={finalUserId}
+                  isAuthenticated={true}
                 />
               </div>
               <ViewList
@@ -96,6 +103,7 @@ export default async function Home() {
               </p>
               <PasteButton 
                 userId={finalUserId}
+                isAuthenticated={true}
               />
             </div>
           )}

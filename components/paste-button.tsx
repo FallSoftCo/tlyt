@@ -3,14 +3,15 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ClipboardIcon, CheckIcon } from 'lucide-react'
-import { submitYouTubeLinkUnauthenticated } from '@/app/actions'
+import { submitYouTubeLinkUnauthenticated, submitYouTubeLinkAuthenticated } from '@/app/actions'
 
 interface PasteButtonProps {
   userId: string
+  isAuthenticated?: boolean
   onVideoSubmitted?: () => void
 }
 
-export function PasteButton({ userId, onVideoSubmitted }: PasteButtonProps) {
+export function PasteButton({ userId, isAuthenticated = false, onVideoSubmitted }: PasteButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -42,8 +43,10 @@ export function PasteButton({ userId, onVideoSubmitted }: PasteButtonProps) {
         return
       }
 
-      // Submit the YouTube link
-      const result = await submitYouTubeLinkUnauthenticated(clipboardText, userId)
+      // Submit the YouTube link using appropriate function
+      const result = isAuthenticated 
+        ? await submitYouTubeLinkAuthenticated(clipboardText, userId)
+        : await submitYouTubeLinkUnauthenticated(clipboardText, userId)
       
       if (!result.success) {
         setError(result.error || 'Failed to process video')
