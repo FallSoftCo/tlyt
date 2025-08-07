@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { items, userId } = await request.json();
+    const { items, userId, workosId } = await request.json();
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: "No items in cart" }, { status: 400 });
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     // The customer creation and association will happen in webhook handling
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      client_reference_id: userId || '', // This will be visible in the webhook
+      client_reference_id: workosId || userId || '', // Use workosId for authenticated users, fallback to userId
       line_items: items.map((item: { priceId: string; quantity: number }) => ({
         price: item.priceId,
         quantity: item.quantity,

@@ -95,6 +95,7 @@ export default async function ChipsPage() {
             <ChipPackages
               packages={packages}
               userId={user.id}
+              workosId={user.workosId || undefined}
               onPackageSelected={() => {
                 // This will redirect to Stripe, so no action needed
               }}

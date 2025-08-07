@@ -10,10 +10,11 @@ import type { ChipPackage } from '@/lib/generated/prisma'
 interface ChipPackagesProps {
   packages: ChipPackage[]
   userId: string
+  workosId?: string
   onPackageSelected?: () => void
 }
 
-export function ChipPackages({ packages, userId, onPackageSelected }: ChipPackagesProps) {
+export function ChipPackages({ packages, userId, workosId, onPackageSelected }: ChipPackagesProps) {
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -41,7 +42,8 @@ export function ChipPackages({ packages, userId, onPackageSelected }: ChipPackag
             priceId: stripePriceId,
             quantity: 1
           }],
-          userId: userId
+          userId: userId,
+          workosId: workosId
         }),
       })
 
