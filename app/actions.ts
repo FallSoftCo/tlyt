@@ -92,6 +92,14 @@ export const upsertVideoAction = async (youtubeUrl: string, chipCost?: number): 
       return { success: false, error: 'Video not found on YouTube' };
     }
 
+    // Check if this is a live video - cannot be processed
+    if (youtubeData.snippet.liveBroadcastContent === 'live' || youtubeData.liveStreamingDetails) {
+      return { 
+        success: false, 
+        error: 'Live videos cannot be processed. Please wait until the stream ends and try again.' 
+      };
+    }
+
     // Transform YouTube data to our model format
     const videoData = mapYouTubeDataToVideo(youtubeData, chipCost);
 

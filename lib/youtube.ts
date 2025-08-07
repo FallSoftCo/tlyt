@@ -10,6 +10,7 @@ export interface YouTubeVideoData {
     categoryId: string;
     defaultLanguage?: string;
     defaultAudioLanguage?: string;
+    liveBroadcastContent?: string;
   };
   contentDetails: {
     duration: string;
@@ -24,6 +25,11 @@ export interface YouTubeVideoData {
   };
   status?: {
     privacyStatus?: string;
+  };
+  liveStreamingDetails?: {
+    actualStartTime?: string;
+    scheduledStartTime?: string;
+    concurrentViewers?: string;
   };
 }
 
@@ -78,7 +84,7 @@ export async function fetchVideoMetadata(videoId: string): Promise<YouTubeVideoD
     throw new Error('YouTube API key not configured');
   }
 
-  const url = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&key=${apiKey}&part=snippet,contentDetails,statistics,status`;
+  const url = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&key=${apiKey}&part=snippet,contentDetails,statistics,status,liveStreamingDetails`;
 
   try {
     const response = await fetch(url);
