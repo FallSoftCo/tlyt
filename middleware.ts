@@ -1,7 +1,9 @@
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
-export default authkitMiddleware();
+export default authkitMiddleware({
+  debug: true
+});
 
 export const config = {
-  matcher: ['/api/debug-auth']
+  matcher: ['/', '/api/debug-auth']
 }
