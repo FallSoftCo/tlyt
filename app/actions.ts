@@ -16,7 +16,7 @@ import type { Video, Analysis, View, User, History, Request, Transaction, ChipPa
 
 // WorkOS Authentication functions
 export const handleSignOutAction = async () => {
-  // Use NEXT_PUBLIC_BASE_URL if available, otherwise construct from protocol and VERCEL_URL
+  // Get the base URL for the application
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
     `${process.env.VERCEL_ENV === "development" ? "http://" : "https://"}${process.env.VERCEL_URL || "localhost:3256"}`;
   
@@ -25,11 +25,23 @@ export const handleSignOutAction = async () => {
 }
 
 export const getSignInUrlAction = async () => {
-  return await getSignInUrl();
+  // Get the base URL for the application
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+    `${process.env.VERCEL_ENV === "development" ? "http://" : "https://"}${process.env.VERCEL_URL || "localhost:3256"}`;
+  
+  return await getSignInUrl({
+    redirectUri: `${baseUrl}/callback`
+  });
 }
 
 export const getSignUpUrlAction = async () => {
-  return await getSignUpUrl();
+  // Get the base URL for the application  
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+    `${process.env.VERCEL_ENV === "development" ? "http://" : "https://"}${process.env.VERCEL_URL || "localhost:3256"}`;
+    
+  return await getSignUpUrl({
+    redirectUri: `${baseUrl}/callback`
+  });
 }
 
 /**
