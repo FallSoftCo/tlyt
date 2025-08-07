@@ -1,25 +1,25 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@workos-inc/authkit-nextjs';
+import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
-    const { user } = await withAuth();
+    // Get the session cookie
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get('wos-session');
     
-    if (!user) {
+    if (!sessionCookie) {
       return NextResponse.json({
         authenticated: false,
-        error: 'No user found'
+        error: 'No session cookie found'
       });
     }
-    
+
+    // Try to get user from session - this is a basic approach
+    // Note: This is a simplified version, actual session validation would be more complex
     return NextResponse.json({
       authenticated: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName
-      }
+      sessionCookie: sessionCookie.value ? 'present' : 'missing',
+      cookieName: sessionCookie.name
     });
   } catch (error) {
     return NextResponse.json({

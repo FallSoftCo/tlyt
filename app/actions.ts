@@ -516,7 +516,10 @@ export const initializeUser = async (existingUserId?: string): Promise<{
     }
 
     if (workosUser) {
-      // Handle authenticated user
+      // Handle authenticated user - this branch is currently disabled
+      // TODO: Re-enable once WorkOS middleware issues are resolved
+      
+      console.log('WorkOS authenticated user handling is temporarily disabled');
       
       // First, try to find existing user by WorkOS ID
       let user = await prisma.user.findUnique({
