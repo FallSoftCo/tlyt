@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useAuth } from '@workos-inc/authkit-nextjs/components'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,10 +11,11 @@ import type { User } from '@/lib/generated/prisma'
 
 interface AuthHeaderProps {
   user?: User | null
-  isAuthenticated: boolean
+  chipBalance?: number
 }
 
-export function AuthHeader({ user, isAuthenticated }: AuthHeaderProps) {
+export function AuthHeader({ user, chipBalance }: AuthHeaderProps) {
+  const { user: workosUser } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSignIn = async () => {
@@ -50,7 +52,7 @@ export function AuthHeader({ user, isAuthenticated }: AuthHeaderProps) {
     }
   }
 
-  if (isAuthenticated && user) {
+  if (workosUser) {
     return (
       <Card className="mb-6">
         <CardContent className="p-4">
@@ -60,20 +62,24 @@ export function AuthHeader({ user, isAuthenticated }: AuthHeaderProps) {
                 <UserIcon className="w-4 h-4 text-muted-foreground" />
                 <div>
                   <p className="font-medium text-sm">
-                    {user.name || user.email || 'User'}
+                    {workosUser.firstName && workosUser.lastName 
+                      ? `${workosUser.firstName} ${workosUser.lastName}`
+                      : workosUser.firstName || workosUser.email || 'User'}
                   </p>
-                  {user.email && user.name && (
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  {workosUser.email && (
+                    <p className="text-xs text-muted-foreground">{workosUser.email}</p>
                   )}
                 </div>
               </div>
               
-              <div className="flex items-center gap-2">
-                <CoinsIcon className="w-4 h-4 text-amber-500" />
-                <Badge variant="secondary" className="font-mono">
-                  {user.chipBalance} chips
-                </Badge>
-              </div>
+              {user && (
+                <div className="flex items-center gap-2">
+                  <CoinsIcon className="w-4 h-4 text-amber-500" />
+                  <Badge variant="secondary" className="font-mono">
+                    {chipBalance || user.chipBalance || 0} chips
+                  </Badge>
+                </div>
+              )}
             </div>
 
             <Button

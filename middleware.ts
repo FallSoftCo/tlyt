@@ -1,9 +1,9 @@
 import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
 
 export default authkitMiddleware({
-  debug: true
+  redirectUri: 'https://tlyt-fallsoftco.vercel.app/callback'
 });
 
 export const config = {
-  matcher: ['/', '/api/debug-auth']
+  matcher: ['/']
 }

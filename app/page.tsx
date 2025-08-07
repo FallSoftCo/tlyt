@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { withAuth } from '@workos-inc/authkit-nextjs'
 import { getUserData, initializeUser, getRecentTransactions } from './actions'
 import type { Transaction } from '@/lib/generated/prisma'
 import { PasteButton } from '@/components/paste-button'
@@ -11,8 +12,11 @@ export default async function Home() {
   const cookieStore = await cookies()
   let userId = cookieStore.get('userId')?.value
 
+  // Get WorkOS authentication state
+  const { user: workosUser } = await withAuth()
+
   // Initialize user (handles both authenticated and unauthenticated cases)
-  const initResult = await initializeUser(userId)
+  const initResult = await initializeUser(userId, workosUser)
   if (!initResult.success || !initResult.user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -70,7 +74,7 @@ export default async function Home() {
         </header>
 
         {/* Authentication Header */}
-        <AuthHeader user={user} isAuthenticated={isAuthenticated} />
+        <AuthHeader user={user} chipBalance={user?.chipBalance} />
 
         <main>
           {isAuthenticated && user && (

@@ -37,7 +37,7 @@ export default async function ChipsPage() {
             </p>
           </header>
 
-          <AuthHeader user={user} isAuthenticated={isAuthenticated} />
+          <AuthHeader user={user} chipBalance={user?.chipBalance} />
 
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold mb-4">Sign In Required</h2>
@@ -80,7 +80,7 @@ export default async function ChipsPage() {
           </div>
         </header>
 
-        <AuthHeader user={user} isAuthenticated={isAuthenticated} />
+        <AuthHeader user={user} chipBalance={user?.chipBalance} />
 
         <main>
           <div className="mb-8">

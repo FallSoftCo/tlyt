@@ -485,41 +485,20 @@ export const submitYouTubeLinkUnauthenticated = async (
  * @param existingUserId - Optional existing user ID from cookie for upgrade scenarios
  * @returns User info, authentication status, and associated history
  */
-export const initializeUser = async (existingUserId?: string): Promise<{
+export const initializeUser = async (existingUserId?: string, workosUser?: { id: string; email: string; firstName: string | null; lastName: string | null } | null): Promise<{
   success: boolean;
   isAuthenticated: boolean;
   user?: User;
   history?: History;
   error?: string;
 }> => {
-  console.log('=== initializeUser called ===', { existingUserId });
+  console.log('=== initializeUser called ===', { existingUserId, workosUser: workosUser ? { id: workosUser.id, email: workosUser.email } : null });
   
   try {
-    // Try to get authenticated user from WorkOS
-    let workosUser = null;
-    try {
-      console.log('Attempting WorkOS authentication check...');
-      const authResult = await withAuth();
-      workosUser = authResult.user;
-      if (workosUser) {
-        console.log('✅ WorkOS authentication successful:', { 
-          userId: workosUser.id, 
-          email: workosUser.email,
-          firstName: workosUser.firstName 
-        });
-      } else {
-        console.log('⚠️  WorkOS authResult.user is null/undefined');
-      }
-    } catch (error) {
-      // User is not authenticated - this is expected for unauthenticated users
-      console.log('❌ User not authenticated via WorkOS:', error instanceof Error ? error.message : 'Unknown error');
-    }
 
     if (workosUser) {
-      // Handle authenticated user - this branch is currently disabled
-      // TODO: Re-enable once WorkOS middleware issues are resolved
-      
-      console.log('WorkOS authenticated user handling is temporarily disabled');
+      // Handle authenticated user
+      console.log('✅ Processing authenticated WorkOS user');
       
       // First, try to find existing user by WorkOS ID
       let user = await prisma.user.findUnique({
