@@ -25,22 +25,14 @@ export const handleSignOutAction = async () => {
 }
 
 export const getSignInUrlAction = async () => {
-  // Get the base URL for the application
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-    `${process.env.VERCEL_ENV === "development" ? "http://" : "https://"}${process.env.VERCEL_URL || "localhost:3256"}`;
-  
   return await getSignInUrl({
-    redirectUri: `${baseUrl}/callback`
+    redirectUri: process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI
   });
 }
 
 export const getSignUpUrlAction = async () => {
-  // Get the base URL for the application  
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-    `${process.env.VERCEL_ENV === "development" ? "http://" : "https://"}${process.env.VERCEL_URL || "localhost:3256"}`;
-    
   return await getSignUpUrl({
-    redirectUri: `${baseUrl}/callback`
+    redirectUri: process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI
   });
 }
 
