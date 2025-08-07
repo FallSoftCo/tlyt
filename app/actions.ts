@@ -498,9 +498,14 @@ export const initializeUser = async (existingUserId?: string): Promise<{
     try {
       const authResult = await withAuth();
       workosUser = authResult.user;
-    } catch {
+      console.log('WorkOS authentication successful:', { 
+        userId: workosUser.id, 
+        email: workosUser.email,
+        firstName: workosUser.firstName 
+      });
+    } catch (error) {
       // User is not authenticated - this is expected for unauthenticated users
-      console.log('User not authenticated via WorkOS');
+      console.log('User not authenticated via WorkOS:', error instanceof Error ? error.message : 'Unknown error');
     }
 
     if (workosUser) {

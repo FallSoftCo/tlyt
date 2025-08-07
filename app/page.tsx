@@ -26,6 +26,13 @@ export default async function Home() {
 
   const { user, isAuthenticated } = initResult
   userId = user.id
+  
+  console.log('Page rendering with authentication state:', { 
+    isAuthenticated, 
+    userId: user.id,
+    workosId: user.workosId,
+    email: user.email 
+  })
 
   // Get user data
   const userData = await getUserData(userId)
