@@ -1,6 +1,11 @@
-import { authkitMiddleware } from '@workos-inc/authkit-nextjs';
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export default authkitMiddleware();
+// Minimal middleware that doesn't interfere with WorkOS
+export function middleware(request: NextRequest) {
+  // Just pass through all requests without any processing
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [
@@ -10,4 +15,4 @@ export const config = {
      */
     '/((?!_next/static|_next/image|favicon.ico|public).*)',
   ],
-};
+}
