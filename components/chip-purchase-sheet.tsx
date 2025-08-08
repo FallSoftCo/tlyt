@@ -113,20 +113,20 @@ export function ChipPurchaseSheet({ packages, canCheckout, trigger }: ChipPurcha
       <SheetTrigger asChild>
         {trigger}
       </SheetTrigger>
-      <SheetContent className="w-full max-w-[400px] sm:max-w-md flex flex-col h-full">
-        <SheetHeader className="flex-shrink-0">
+      <SheetContent className="w-full max-w-[400px] sm:max-w-md flex flex-col h-full p-6">
+        <SheetHeader className="flex-shrink-0 pb-4">
           <SheetTitle>
             {canCheckout ? 'Buy Processing Chips' : 'Chip Pricing'}
           </SheetTitle>
         </SheetHeader>
         
-        <div className="flex-1 overflow-y-auto py-4">
+        <div className="flex-1 overflow-y-auto">
           <div className="space-y-4">
             <div className="p-3 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">
                 {canCheckout 
-                  ? '1 chip per video processed. Choose your package below.'
-                  : 'See our chip pricing. Sign in to purchase and get unlimited video analysis.'
+                  ? '1 chip per 30 minutes of video duration. Choose your package below.'
+                  : 'See our chip pricing. 1 chip per 30 minutes of video duration. Sign in to purchase and get unlimited video analysis.'
                 }
               </p>
             </div>
