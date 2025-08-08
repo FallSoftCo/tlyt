@@ -1,16 +1,12 @@
 import { cookies } from 'next/headers'
 import { withAuth } from '@workos-inc/authkit-nextjs'
 import { redirect } from 'next/navigation'
-import { getUserData, initializeUser, getRecentTransactions, getActiveChipPackages } from './actions'
-import type { Transaction } from '@/lib/generated/prisma'
+import { getUserData, initializeUser, getActiveChipPackages } from './actions'
 import { PasteButton } from '@/components/paste-button'
 import { ViewList } from '@/components/view-list'
 import { CookieHandler } from '@/components/cookie-handler'
-import { AuthHeader } from '@/components/auth-header'
-import { ChipBalanceWidget } from '@/components/chip-balance-widget'
-import { ChipPurchaseSheet } from '@/components/chip-purchase-sheet'
-import { Button } from '@/components/ui/button'
-import { ShoppingCart } from 'lucide-react'
+import { Header } from '@/components/header'
+import { Footer } from '@/components/footer'
 
 export default async function Home() {
   const cookieStore = await cookies()
@@ -47,10 +43,6 @@ export default async function Home() {
 
   const { views, videos = [], analyses = [] } = userData
 
-  // Get recent transactions
-  const transactionsResult = await getRecentTransactions(finalUserId, 5)
-  const recentTransactions: Transaction[] = transactionsResult.success ? 
-    (transactionsResult.transactions || []) : []
 
   // Get available chip packages
   const packagesResult = await getActiveChipPackages()
@@ -59,73 +51,39 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-background">
       <CookieHandler userId={finalUserId} />
-      <div className="container mx-auto px-4 py-8">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">TLYT</h1>
-          <p className="text-muted-foreground mt-2">
-            TLYT watches YouTube so you don&apos;t have to
-          </p>
-        </header>
+      
+      {/* Fixed Header */}
+      <Header packages={packages} chipBalance={user.chipBalance} />
 
-        {/* Authentication Header - only uses useAuth() hook now */}
-        <AuthHeader />
-
-        <main>
-          {/* Authenticated user content */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-            <div className="lg:col-span-1">
-              <ChipBalanceWidget
-                user={user}
-                recentTransactions={recentTransactions}
-              />
-            </div>
-            <div className="lg:col-span-3">
-              {/* Buy Chips Button */}
-              <div className="flex justify-center">
-                <ChipPurchaseSheet
-                  packages={packages}
-                  canCheckout={true}
-                  trigger={
-                    <Button size="lg" className="w-full max-w-md">
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Buy Processing Chips
-                    </Button>
-                  }
-                />
-              </div>
-            </div>
+      {/* Main Content */}
+      <div className="pt-[3.5rem] sm:pt-[5rem] pb-20 px-4 max-w-[90ch] mx-auto">
+        {views && views.length > 0 ? (
+          <div className="space-y-4">
+            <ViewList
+              views={views}
+              videos={videos}
+              analyses={analyses}
+              userId={finalUserId}
+              isAuthenticated={true}
+              chipBalance={user.chipBalance}
+            />
           </div>
-
-          {views && views.length > 0 ? (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Your Videos</h2>
-                <PasteButton 
-                  userId={finalUserId}
-                />
-              </div>
-              <ViewList
-                views={views}
-                videos={videos}
-                analyses={analyses}
-                userId={finalUserId}
-                isAuthenticated={true}
-                chipBalance={user.chipBalance}
-              />
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <h2 className="text-xl font-semibold mb-4">Welcome to TLYT</h2>
-              <p className="text-muted-foreground mb-6">
-                Get started by pasting a YouTube video link
-              </p>
-              <PasteButton 
-                userId={finalUserId}
-              />
-            </div>
-          )}
-        </main>
+        ) : (
+          <div className="text-center py-20">
+            <h1 className="text-4xl font-bold mb-8">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+                TLYT
+              </span>{' '}
+              watches YouTube so you don&apos;t have to
+            </h1>
+            
+            <PasteButton userId={finalUserId} />
+          </div>
+        )}
       </div>
+
+      {/* Fixed Footer */}
+      <Footer userId={finalUserId} />
     </div>
   )
 }

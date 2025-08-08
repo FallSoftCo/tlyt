@@ -3,10 +3,8 @@ import { getUserData, initializeUser, getActiveChipPackages } from '../actions'
 import { PasteButton } from '@/components/paste-button'
 import { ViewList } from '@/components/view-list'
 import { CookieHandler } from '@/components/cookie-handler'
-import { AuthHeader } from '@/components/auth-header'
-import { ChipPurchaseSheet } from '@/components/chip-purchase-sheet'
-import { Button } from '@/components/ui/button'
-import { DollarSign } from 'lucide-react'
+import { Header } from '@/components/header'
+import { Footer } from '@/components/footer'
 
 export default async function TrialPage() {
   const cookieStore = await cookies()
@@ -50,62 +48,37 @@ export default async function TrialPage() {
   return (
     <div className="min-h-screen bg-background">
       <CookieHandler userId={userId} />
-      <div className="container mx-auto px-4 py-8">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">TLYT</h1>
-          <p className="text-muted-foreground mt-2">
-            TLYT watches YouTube so you don&apos;t have to
-          </p>
-        </header>
+      
+      {/* Fixed Header */}
+      <Header packages={packages} />
 
-        {/* Sign up/Sign in buttons for trial users */}
-        <AuthHeader />
-
-        {/* Pricing transparency for trial users */}
-        {packages.length > 0 && (
-          <div className="mb-6">
-            <ChipPurchaseSheet
-              packages={packages}
-              canCheckout={false}
-              trigger={
-                <Button variant="outline" className="w-full">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  View Pricing & Sign Up
-                </Button>
-              }
+      {/* Main Content */}
+      <div className="pt-[3.5rem] sm:pt-[5rem] pb-20 px-4 max-w-[90ch] mx-auto">
+        {views && views.length > 0 ? (
+          <div className="space-y-4">
+            <ViewList
+              views={views}
+              videos={videos}
+              analyses={analyses}
+              userId={userId}
             />
           </div>
+        ) : (
+          <div className="text-center py-20">
+            <h1 className="text-4xl font-bold mb-8">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+                TLYT
+              </span>{' '}
+              watches YouTube so you don&apos;t have to
+            </h1>
+            
+            <PasteButton userId={userId} />
+          </div>
         )}
-
-        <main>
-          {views && views.length > 0 ? (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Your Videos</h2>
-                <PasteButton 
-                  userId={userId}
-                />
-              </div>
-              <ViewList
-                views={views}
-                videos={videos}
-                analyses={analyses}
-                userId={userId}
-              />
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <h2 className="text-xl font-semibold mb-4">Welcome to TLYT</h2>
-              <p className="text-muted-foreground mb-6">
-                Get started by pasting a YouTube video link
-              </p>
-              <PasteButton 
-                userId={userId}
-              />
-            </div>
-          )}
-        </main>
       </div>
+
+      {/* Fixed Footer */}
+      <Footer userId={userId} />
     </div>
   )
 }
