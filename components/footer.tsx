@@ -1,5 +1,3 @@
-'use client'
-
 import { PasteButton } from '@/components/paste-button'
 
 interface FooterProps {

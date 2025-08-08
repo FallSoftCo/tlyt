@@ -53,7 +53,7 @@ export default async function Home() {
       <CookieHandler userId={finalUserId} />
       
       {/* Fixed Header */}
-      <Header packages={packages} chipBalance={user.chipBalance} />
+      <Header packages={packages} user={user} chipBalance={user.chipBalance} />
 
       {/* Main Content */}
       <div className="pt-[3.5rem] sm:pt-[5rem] pb-20 px-4 max-w-[90ch] mx-auto">
