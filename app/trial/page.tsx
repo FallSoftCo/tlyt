@@ -55,7 +55,7 @@ export default async function TrialPage() {
       {/* Main Content */}
       <div className="pt-[3.5rem] sm:pt-[5rem] pb-20 px-4 max-w-[90ch] mx-auto">
         {views && views.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-4 py-4">
             <ViewList
               views={views}
               videos={videos}
