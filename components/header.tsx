@@ -14,7 +14,11 @@ export function Header({ packages, user, chipBalance }: HeaderProps) {
     <header className="fixed top-0 left-0 right-0 z-50 h-[3.5rem] sm:h-[5rem] px-4 sm:px-6 flex items-center justify-between rounded-b-3xl bg-background/95 backdrop-blur-sm border-b">
       {/* Logo */}
       <div className="flex items-center">
-        <h1 className="text-xl sm:text-2xl font-bold">TLYT</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500">
+            TLYT
+          </span>
+        </h1>
       </div>
       
       {/* Account Button - shows chips for authenticated users, or sign in prompt for unauthenticated */}

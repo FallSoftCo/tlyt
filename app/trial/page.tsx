@@ -66,7 +66,7 @@ export default async function TrialPage() {
         ) : (
           <div className="text-center py-20">
             <h1 className="text-4xl font-bold mb-8">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500">
                 TLYT
               </span>{' '}
               watches YouTube so you don&apos;t have to
