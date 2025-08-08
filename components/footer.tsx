@@ -6,7 +6,7 @@ interface FooterProps {
 
 export function Footer({ userId }: FooterProps) {
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-50 p-4 pb-6 rounded-t-3xl">
+    <footer className="fixed bottom-0 left-0 right-0 z-50 p-4 pb-6 rounded-t-3xl bg-background/95 backdrop-blur-sm border-t">
       <div className="flex items-center justify-center max-w-[90ch] mx-auto">
         <PasteButton userId={userId} />
       </div>

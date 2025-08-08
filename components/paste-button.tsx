@@ -100,11 +100,6 @@ export function PasteButton({ userId, onVideoSubmitted }: PasteButtonProps) {
         </div>
       )}
       
-      {!error && !success && (
-        <div className="text-sm text-muted-foreground text-center max-w-md">
-          Copy a YouTube URL to your clipboard, then click the button above
-        </div>
-      )}
     </div>
   )
 }

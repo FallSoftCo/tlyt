@@ -11,7 +11,7 @@ interface HeaderProps {
 
 export function Header({ packages, user, chipBalance }: HeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-[3.5rem] sm:h-[5rem] px-4 sm:px-6 flex items-center justify-between rounded-b-3xl">
+    <header className="fixed top-0 left-0 right-0 z-50 h-[3.5rem] sm:h-[5rem] px-4 sm:px-6 flex items-center justify-between rounded-b-3xl bg-background/95 backdrop-blur-sm border-b">
       {/* Logo */}
       <div className="flex items-center">
         <h1 className="text-xl sm:text-2xl font-bold">TLYT</h1>
