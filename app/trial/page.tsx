@@ -92,12 +92,13 @@ export default async function TrialPage() {
             />
           </div>
         ) : (
-          <div className="text-center py-20">
-            <h1 className="text-4xl font-bold mb-8">
+          <div className="text-center py-24">
+            <h1 className="text-5xl sm:text-6xl font-bold leading-tight mb-8">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500">
                 TLYT
               </span>{' '}
-              watches YouTube so you don&apos;t have to
+              watches YouTube<br />
+              so you don&apos;t have to
             </h1>
             
             <PasteButton userId={userId} />
