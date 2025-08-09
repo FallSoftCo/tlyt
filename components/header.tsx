@@ -1,5 +1,6 @@
 import { ChipPurchaseSheet } from '@/components/chip-purchase-sheet'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { User, Cpu } from 'lucide-react'
 import type { ChipPackage, User as UserType } from '@/lib/generated/prisma'
 
@@ -21,8 +22,9 @@ export function Header({ packages, user, chipBalance }: HeaderProps) {
         </h1>
       </div>
       
-      {/* Account Button - shows chips for authenticated users, or sign in prompt for unauthenticated */}
-      <div className="flex items-center">
+      {/* Theme Toggle and Account Button */}
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
         <ChipPurchaseSheet
           packages={packages}
           chipBalance={chipBalance}
