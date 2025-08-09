@@ -12,7 +12,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '../lib/prisma';
 import { extractVideoId, fetchVideoMetadata, mapYouTubeDataToVideo, parseISO8601DurationToSeconds } from '../lib/youtube';
 import { logger } from '../lib/logger';
-import type { Video, Analysis, View, User, History, Request, Transaction, ChipPackage } from '../lib/generated/prisma';
+import type { Video, Analysis, View, User, History, Request, Transaction, ChipPackage, RequestStatus } from '../lib/generated/prisma';
 
 // WorkOS Authentication functions
 export const handleSignOutAction = async () => {
@@ -180,6 +180,12 @@ export const analyzeVideoWithGemini = async (
       return { success: false, error: 'Gemini API key not configured' };
     }
 
+    // Update request status to IN_PROGRESS
+    await prisma.request.update({
+      where: { id: requestId },
+      data: { status: 'IN_PROGRESS' }
+    });
+
     // Construct API endpoint
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -346,10 +352,26 @@ export const analyzeVideoWithGemini = async (
     });
     console.log('Analysis record created:', analysis.id);
 
+    // Update request status to COMPLETED
+    await prisma.request.update({
+      where: { id: requestId },
+      data: { status: 'COMPLETED' }
+    });
+
     return { success: true, analysis };
 
   } catch (error) {
     console.error('Error in analyzeVideoWithGemini:', error);
+    
+    // Update request status to FAILED
+    try {
+      await prisma.request.update({
+        where: { id: requestId },
+        data: { status: 'FAILED' }
+      });
+    } catch (statusUpdateError) {
+      console.error('Failed to update request status to FAILED:', statusUpdateError);
+    }
     
     // Handle specific error types
     if (error instanceof SyntaxError) {
@@ -961,7 +983,8 @@ export const requestFreeAnalysis = async (
         userId: userId,
         userPrompt: userPrompt || null,
         videoIds: [videoRecordId],
-        analysisIds: [] // Will be populated after analysis
+        analysisIds: [], // Will be populated after analysis
+        status: 'PENDING'
       }
     });
 
@@ -1030,6 +1053,101 @@ export const requestFreeAnalysis = async (
     return { success: false, error: 'An unexpected error occurred' };
   }
 }
+
+/**
+ * Check analysis status for a view and refresh data if completed
+ * @param viewId - ID of the view to check
+ * @param userId - User ID for authorization
+ * @returns Status and updated data if analysis is complete
+ */
+export const checkAnalysisStatus = async (
+  viewId: string,
+  userId: string
+): Promise<{
+  success: boolean;
+  status?: RequestStatus;
+  analysisComplete?: boolean;
+  view?: View;
+  analysis?: Analysis;
+  error?: string;
+}> => {
+  try {
+    // Input validation
+    if (!viewId || typeof viewId !== 'string') {
+      return { success: false, error: 'Invalid view ID provided' };
+    }
+    if (!userId || typeof userId !== 'string') {
+      return { success: false, error: 'Invalid user ID provided' };
+    }
+
+    // Get the view and validate it belongs to the user
+    const view = await prisma.view.findUnique({
+      where: { id: viewId }
+    });
+
+    if (!view) {
+      return { success: false, error: 'View not found' };
+    }
+
+    if (view.userId !== userId) {
+      return { success: false, error: 'View does not belong to user' };
+    }
+
+    // Check if view has any requests
+    if (view.requestIds.length === 0) {
+      return { 
+        success: true, 
+        status: undefined,
+        analysisComplete: false 
+      };
+    }
+
+    // Get the most recent request
+    const latestRequestId = view.requestIds[view.requestIds.length - 1];
+    const request = await prisma.request.findUnique({
+      where: { id: latestRequestId }
+    });
+
+    if (!request) {
+      return { success: false, error: 'Request not found' };
+    }
+
+    // Check if analysis is already complete
+    const analysisComplete = view.analysisIds.length > 0;
+    let analysis: Analysis | undefined;
+
+    if (analysisComplete) {
+      // Get the analysis data
+      const analysisId = view.analysisIds[view.analysisIds.length - 1];
+      const analysisResult = await prisma.analysis.findUnique({
+        where: { id: analysisId }
+      });
+      if (analysisResult) {
+        analysis = analysisResult;
+      }
+    }
+
+    return {
+      success: true,
+      status: request.status,
+      analysisComplete,
+      view,
+      analysis
+    };
+
+  } catch (error) {
+    console.error('Error in checkAnalysisStatus:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('Prisma')) {
+        return { success: false, error: 'Database error occurred' };
+      }
+    }
+
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+};
 
 /**
  * Get specific analysis by ID
@@ -1415,7 +1533,8 @@ export const requestAnalysisAuthenticated = async (
         userId: userId,
         userPrompt: userPrompt || null,
         videoIds: [videoRecordId],
-        analysisIds: [] // Will be populated after analysis
+        analysisIds: [], // Will be populated after analysis
+        status: 'PENDING'
       }
     });
 

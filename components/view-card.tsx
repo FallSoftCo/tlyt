@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ClockIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
-import { updateViewExpansion, requestFreeAnalysis, requestAnalysisAuthenticated } from '@/app/actions'
+import { updateViewExpansion, requestFreeAnalysis, requestAnalysisAuthenticated, checkAnalysisStatus } from '@/app/actions'
 import { AnalysisLoading } from '@/components/analysis-loading'
 import type { View, Video, Analysis } from '@/lib/generated/prisma'
 
@@ -25,8 +25,12 @@ export function ViewCard({ view, video, analysis, userId, isAuthenticated = fals
   const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(view.isExpanded)
   const [isRequestingAnalysis, setIsRequestingAnalysis] = useState(false)
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  // Check if analysis is in progress (has request but no analysis)
+  const isAnalysisInProgress = view.requestIds.length > 0 && view.analysisIds.length === 0
 
   const formatDuration = (duration: string) => {
     // Duration is in ISO 8601 format like "PT4M13S" or "PT1H2M10S"
@@ -88,6 +92,34 @@ export function ViewCard({ view, video, analysis, userId, isAuthenticated = fals
       setAnalysisError('An unexpected error occurred')
     } finally {
       setIsRequestingAnalysis(false)
+    }
+  }
+
+  const handleCheckStatus = async () => {
+    try {
+      setIsCheckingStatus(true)
+      setAnalysisError(null)
+      
+      const result = await checkAnalysisStatus(view.id, userId)
+      
+      if (!result.success) {
+        setAnalysisError(result.error || 'Failed to check analysis status')
+        return
+      }
+      
+      // If analysis is complete, refresh the page to show results
+      if (result.analysisComplete) {
+        if (onAnalysisRequested) {
+          onAnalysisRequested()
+        } else {
+          router.refresh()
+        }
+      }
+      
+    } catch {
+      setAnalysisError('An unexpected error occurred while checking status')
+    } finally {
+      setIsCheckingStatus(false)
     }
   }
 
@@ -213,10 +245,24 @@ export function ViewCard({ view, video, analysis, userId, isAuthenticated = fals
 
       {!analysis && (
         <CardContent className="pt-0">
-          {isRequestingAnalysis ? (
-            <AnalysisLoading 
-              chipCost={video.chipCost}
-            />
+          {(isRequestingAnalysis || isAnalysisInProgress) ? (
+            <div className="space-y-3">
+              <AnalysisLoading 
+                chipCost={video.chipCost}
+              />
+              {isAnalysisInProgress && !isRequestingAnalysis && (
+                <div className="flex justify-center">
+                  <Button
+                    onClick={handleCheckStatus}
+                    disabled={isCheckingStatus}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {isCheckingStatus ? 'Checking...' : 'Check Status'}
+                  </Button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors">
               <div className="flex items-center justify-between">

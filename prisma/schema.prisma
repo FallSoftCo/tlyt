@@ -70,13 +70,14 @@ model Analysis {
 }
 
 model Request {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  userPrompt  String?  @map("user_prompt")
-  analysisIds String[] @map("analysis_ids")
-  videoIds    String[] @map("video_ids")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id          String        @id @default(cuid())
+  userId      String        @map("user_id")
+  userPrompt  String?       @map("user_prompt")
+  analysisIds String[]      @map("analysis_ids")
+  videoIds    String[]      @map("video_ids")
+  status      RequestStatus @default(PENDING)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
 
   @@map("requests")
 }
@@ -147,4 +148,11 @@ enum TransactionType {
   REFUND
   ADMIN_CREDIT
   ADMIN_DEBIT
+}
+
+enum RequestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
 }
