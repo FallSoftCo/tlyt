@@ -3,7 +3,10 @@ import { getUserData, initializeUser, getActiveChipPackages } from '../actions'
 import { PasteButton } from '@/components/paste-button'
 import { ViewList } from '@/components/view-list'
 import { CookieHandler } from '@/components/cookie-handler'
-import { Header } from '@/components/header'
+import { TrialAccountSheet } from '@/components/trial-account-sheet'
+import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { User } from 'lucide-react'
 import { Footer } from '@/components/footer'
 
 export default async function TrialPage() {
@@ -49,8 +52,33 @@ export default async function TrialPage() {
     <div className="min-h-screen bg-background">
       <CookieHandler userId={userId} />
       
-      {/* Fixed Header */}
-      <Header packages={packages} user={null} />
+      {/* Fixed Header for Trial */}
+      <header className="fixed top-0 left-0 right-0 z-50 h-[3.5rem] sm:h-[5rem] px-4 sm:px-6 flex items-center justify-between rounded-b-3xl bg-background/95 backdrop-blur-sm border-b">
+        {/* Logo */}
+        <div className="flex items-center">
+          <h1 className="text-xl sm:text-2xl font-bold">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-red-500">
+              TLYT
+            </span>
+          </h1>
+        </div>
+        
+        {/* Theme Toggle and Account Button */}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <TrialAccountSheet
+            packages={packages}
+            trigger={
+              <Button variant="secondary" className="min-w-[120px] sm:min-w-[150px]">
+                <div className="flex items-center">
+                  <User className="h-5 w-5 mr-2" />
+                  <span className="font-semibold">Get Started</span>
+                </div>
+              </Button>
+            }
+          />
+        </div>
+      </header>
 
       {/* Main Content */}
       <div className="pt-[3.5rem] sm:pt-[5rem] pb-20 px-4 max-w-[90ch] mx-auto">

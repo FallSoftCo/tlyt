@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@workos-inc/authkit-nextjs/components'
 import {
   Sheet,
@@ -13,34 +13,25 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CoinsIcon, ShoppingCart, SparklesIcon, UserPlus, LogIn, LogOut, Cpu, Plus, Minus } from 'lucide-react'
+import { CoinsIcon, ShoppingCart, SparklesIcon, LogOut, Cpu, Plus, Minus } from 'lucide-react'
 import type { ChipPackage } from '@/lib/generated/prisma'
-import { getSignInUrlAction, getSignUpUrlAction, handleSignOutAction } from '@/app/actions'
+import { handleSignOutAction } from '@/app/actions'
 
-interface AccountSheetProps {
+interface ChipPurchaseSheetProps {
   packages: ChipPackage[]
   chipBalance?: number
   trigger: React.ReactNode
 }
 
-export function AccountSheet({ packages, chipBalance, trigger }: AccountSheetProps) {
+export function ChipPurchaseSheet({ packages, chipBalance, trigger }: ChipPurchaseSheetProps) {
   const { user } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [selectedPackageId, setSelectedPackageId] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [signInUrl, setSignInUrl] = useState<string>('')
-  const [signUpUrl, setSignUpUrl] = useState<string>('')
 
   const selectedPackage = packages.find(pkg => pkg.id === selectedPackageId)
-
-  useEffect(() => {
-    if (!user) {
-      getSignInUrlAction().then(setSignInUrl)
-      getSignUpUrlAction().then(setSignUpUrl)
-    }
-  }, [user])
   
   const formatPrice = (priceInCents: number) => {
     return `$${(priceInCents / 100).toFixed(2)}`
@@ -125,40 +116,11 @@ export function AccountSheet({ packages, chipBalance, trigger }: AccountSheetPro
       </SheetTrigger>
       <SheetContent className="w-full max-w-[400px] sm:max-w-md flex flex-col h-full p-6">
         <SheetHeader className="flex-shrink-0 pb-4">
-          <SheetTitle>
-            {user ? 'Account & Chips' : 'Sign In'}
-          </SheetTitle>
+          <SheetTitle>Account & Chips</SheetTitle>
         </SheetHeader>
         
         <div className="flex-1 overflow-y-auto">
-          {!user ? (
-            // Not logged in view  
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Sign in to purchase chips and track your history.
-              </p>
-              {signUpUrl && signInUrl && (
-                <div className="space-y-2">
-                  <Button 
-                    className="w-full" 
-                    onClick={() => window.location.href = signUpUrl}
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Sign Up
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full" 
-                    onClick={() => window.location.href = signInUrl}
-                  >
-                    <LogIn className="h-4 w-4 mr-2" />
-                    Sign In
-                  </Button>
-                </div>
-              )}
-            </div>
-          ) : (
-            // Logged in view
+          {user ? (
             <>
               <div className="border-b pb-4">
                 <div className="flex items-center justify-between">
@@ -335,6 +297,10 @@ export function AccountSheet({ packages, chipBalance, trigger }: AccountSheetPro
                 </div>
               </div>
             </>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">Please sign in to access your account.</p>
+            </div>
           )}
         </div>
       </SheetContent>
@@ -342,5 +308,5 @@ export function AccountSheet({ packages, chipBalance, trigger }: AccountSheetPro
   )
 }
 
-// Keep old export name for compatibility
-export const ChipPurchaseSheet = AccountSheet
+// Export for backward compatibility  
+export const AccountSheet = ChipPurchaseSheet
